@@ -276,7 +276,8 @@ class VodPlayerActivity : ComponentActivity() {
             player = this@VodPlayerActivity.player
             useController = true
             controllerShowTimeoutMs = 4_000
-            controllerAutoShow = true
+            // Başlarken/yüklenirken kontroller kendiliğinden açılmasın
+            controllerAutoShow = false
             setShowSubtitleButton(true)
             setShowNextButton(queue.size > 1)
             setShowPreviousButton(queue.size > 1)
@@ -293,6 +294,7 @@ class VodPlayerActivity : ComponentActivity() {
             subtitleView?.let { styleSubtitles(it, vm.subtitleSize) }
             setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                 titleBox.visibility = v
+                if (v != View.VISIBLE) navigated = false
             })
         }
 
@@ -682,6 +684,8 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
     var onSeek: ((Boolean, Int) -> Unit)? = null
     /** Orta tuşa basma bizim tarafımızdan başlatıldı mı (bırakma da bizde kalsın) */
     private var centerDown = false
+    /** Kontroller açıkken kullanıcı yön tuşlarıyla bir düğmeye gitti mi */
+    var navigated = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val p = player ?: return super.dispatchKeyEvent(event)
@@ -710,7 +714,8 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
         if (isCenter) {
             val pp: View? = findViewById(androidx.media3.ui.R.id.exo_play_pause)
             val focused = findFocus()
-            val ours = !isControllerFullyVisible || focused == null || focused === pp || centerDown
+            // Kullanıcı bilerek başka düğmeye gitmediyse orta tuş her zaman oynat/duraklat
+            val ours = !isControllerFullyVisible || !navigated || focused == null || focused === pp || centerDown
             if (ours) {
                 if (event.action == KeyEvent.ACTION_DOWN) {
                     if (event.repeatCount == 0) {
@@ -730,6 +735,11 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
                 return true
             }
         }
+        // Kontroller açıkken yön tuşu = kullanıcı düğmeler arasında geziyor
+        if (event.action == KeyEvent.ACTION_DOWN && isControllerFullyVisible && (
+                code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
+                    code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN)
+        ) navigated = true
         // Gizliyken sağ/sol bırakılması kontrol düğmesine gitmesin
         if (event.action == KeyEvent.ACTION_UP && !isControllerFullyVisible &&
             (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)
