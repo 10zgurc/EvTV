@@ -126,8 +126,8 @@ class Prefs(ctx: Context) {
 
     /** Kategorileri ülkelere göre grupla */
     var groupCats: Boolean
-        get() = p.getBoolean("groupCats", true)
-        set(v) = p.edit().putBoolean("groupCats", v).apply()
+        get() = p.getBoolean("groupCats2", false)
+        set(v) = p.edit().putBoolean("groupCats2", v).apply()
 
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 

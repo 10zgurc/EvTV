@@ -477,10 +477,6 @@ fun SettingsPane(vm: AppViewModel) {
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
 
-        FocusRow(onClick = { vm.toggleGroupCats() }) { f ->
-            Text("Kategorileri ülkelere göre grupla", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
-            Text(if (vm.groupCats) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
-        }
         FocusRow(onClick = { vm.openCategoryEditor("live") }) {
             Text("Kategorileri düzenle (gizle / sırala)", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
             val n = listOf("live", "movie", "series").sumOf { vm.hiddenCats[it].orEmpty().size }
