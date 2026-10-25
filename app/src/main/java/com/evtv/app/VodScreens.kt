@@ -486,6 +486,11 @@ fun SettingsPane(vm: AppViewModel) {
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
 
+        FocusRow(onClick = { vm.openCategoryEditor("live") }) {
+            Text("Kategorileri düzenle (gizle / sırala)", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            val n = listOf("live", "movie", "series").sumOf { vm.hiddenCats[it].orEmpty().size }
+            if (n > 0) Text("$n gizli", color = C.sub, fontSize = 15.sp)
+        }
         FocusRow(onClick = { vm.toggleLivePreview() }) { f ->
             Text("Kanal listesinde önizleme", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
             Text(if (vm.livePreview) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
@@ -555,6 +560,13 @@ fun SettingsPane(vm: AppViewModel) {
             vm.vodItems.clear()
         }) {
             Text(if (vm.refreshing) "Yenileniyor…" else "Tüm listeleri yenile", color = C.text, fontSize = 17.sp)
+        }
+        FocusRow(onClick = { vm.checkUpdate(manual = true) }) {
+            Text("Güncellemeleri kontrol et", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text("Sürüm ${BuildConfig.VERSION_NAME}", color = C.sub, fontSize = 15.sp)
+        }
+        vm.updateMessage?.takeIf { !vm.updateDialog }?.let {
+            Text(it, color = C.sub, fontSize = 15.sp, modifier = Modifier.padding(start = 14.dp, top = 2.dp, bottom = 4.dp))
         }
         FocusRow(onClick = { vm.showReports() }) {
             Text("Hata raporlarını göster", color = C.text, fontSize = 17.sp)
@@ -686,6 +698,17 @@ private fun ActionButton(text: String, modifier: Modifier = Modifier, onClick: (
 private fun MyListButton(vm: AppViewModel, item: VodItem) {
     val inList = vm.inMyList(item)
     ActionButton(if (inList) "✓  Listemde" else "＋  Listeme ekle") { vm.toggleMyList(item) }
+    TrailerButton(if (item.isSeries) vm.seriesInfo?.trailer else vm.movieInfo?.trailer)
+}
+
+@Composable
+private fun TrailerButton(id: String?) {
+    if (id == null) return
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var failed by remember { mutableStateOf(false) }
+    ActionButton(if (failed) "YouTube bulunamadı" else "🎞  Fragman") {
+        failed = !openTrailer(ctx, id)
+    }
 }
 
 @Composable

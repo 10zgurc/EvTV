@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +68,9 @@ fun EvTvApp(vm: AppViewModel = viewModel()) {
                 Screen.Home -> HomeScreen(vm, states)
                 Screen.Player -> PlayerScreen(vm)
                 Screen.Detail -> DetailScreen(vm)
+                Screen.CategoryEditor -> CategoryEditor(vm)
             }
+            if (vm.updateDialog) UpdateOverlay(vm)
             vm.reportText?.let { ReportOverlay(it) { vm.closeReport() } }
         }
     }
@@ -106,3 +110,64 @@ fun ReportOverlay(text: String, onClose: () -> Unit) {
 private fun Modifier.androidx_background() = this.then(
     Modifier.background(androidx.compose.ui.graphics.Color(0xF2080A0E))
 )
+
+/** "Yeni sürüm var" penceresi */
+@Composable
+fun UpdateOverlay(vm: AppViewModel) {
+    val info = vm.updateInfo ?: return
+    val req = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.activity.compose.BackHandler { vm.dismissUpdate() }
+    LaunchedEffect(Unit) { focusWhenReady { req } }
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xCC000000)),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        androidx.compose.foundation.layout.Column(
+            Modifier.width(560.dp)
+                .background(C.panel, androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                .padding(28.dp),
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.logo_wordmark),
+                contentDescription = null,
+                modifier = Modifier.padding(bottom = 12.dp).androidx_height(40.dp),
+            )
+            androidx.compose.material3.Text("Yeni sürüm hazır: ${info.version}", color = C.text, fontSize = 24.sp)
+            androidx.compose.material3.Text(
+                "Şu an ${BuildConfig.VERSION_NAME} kullanıyorsun. Güncelleyince favorilerin ve ayarların korunur.",
+                color = C.sub, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+            )
+            val p = vm.updateProgress
+            if (p != null) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { p }, color = C.accent, trackColor = C.selected,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                )
+                androidx.compose.material3.Text("İndiriliyor… %${(p * 100).toInt()}", color = C.sub, fontSize = 14.sp)
+            }
+            vm.updateMessage?.let {
+                androidx.compose.material3.Text(it, color = C.accent, fontSize = 15.sp, modifier = Modifier.padding(vertical = 6.dp))
+            }
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 10.dp),
+            ) {
+                androidx.compose.foundation.layout.Box {
+                    FocusRow(modifier = Modifier.focusRequester(req), fill = false, onClick = { vm.startUpdate() }) {
+                        androidx.compose.material3.Text(
+                            if (p != null) "İndiriliyor…" else "Güncelle", color = C.text, fontSize = 18.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp),
+                        )
+                    }
+                }
+                androidx.compose.foundation.layout.Box {
+                    FocusRow(fill = false, onClick = { vm.dismissUpdate() }) {
+                        androidx.compose.material3.Text("Sonra", color = C.sub, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 10.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun Modifier.androidx_height(h: androidx.compose.ui.unit.Dp) = this.then(Modifier.height(h))

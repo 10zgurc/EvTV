@@ -18,7 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Login, Home, Player, Detail }
+enum class Screen { Login, Home, Player, Detail, CategoryEditor }
 
 enum class Section { Home, Live, Guide, Movies, Series, Settings }
 
@@ -63,9 +63,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var now by mutableLongStateOf(System.currentTimeMillis())
         private set
 
+    // ---- Kategori gizleme / sıralama ----
+    val hiddenCats = mutableStateMapOf(
+        "live" to prefs.hiddenCats("live"), "movie" to prefs.hiddenCats("movie"), "series" to prefs.hiddenCats("series"),
+    )
+    val catOrders = mutableStateMapOf(
+        "live" to prefs.catOrder("live"), "movie" to prefs.catOrder("movie"), "series" to prefs.catOrder("series"),
+    )
+
+    /** Kullanıcının sırasına göre dizer (gizliler dahil) */
+    fun ordered(type: String, cats: List<Category>): List<Category> {
+        val order = catOrders[type].orEmpty()
+        if (order.isEmpty()) return cats
+        val idx = HashMap<String, Int>(order.size * 2).apply { order.forEachIndexed { i, id -> put(id, i) } }
+        return cats.withIndex().sortedBy { (i, c) -> idx[c.id] ?: (1_000_000 + i) }.map { it.value }
+    }
+
+    /** Gizliler çıkarılmış, sıralanmış */
+    fun arranged(type: String, cats: List<Category>): List<Category> {
+        val hidden = hiddenCats[type].orEmpty()
+        return ordered(type, cats).filter { it.id !in hidden }
+    }
+
     val categories by derivedStateOf {
         if (allChannels.isEmpty()) emptyList()
-        else listOf(Category(CAT_ALL, "Tüm kanallar"), Category(CAT_FAV, "Favoriler")) + serverCategories
+        else listOf(Category(CAT_ALL, "Tüm kanallar"), Category(CAT_FAV, "Favoriler")) + arranged("live", serverCategories)
+    }
+
+    /** "Tüm kanallar": gizli kategorilerin kanalları hariç */
+    private val shownChannels by derivedStateOf {
+        val hidden = hiddenCats["live"].orEmpty()
+        if (hidden.isEmpty()) allChannels else allChannels.filter { it.categoryId !in hidden }
     }
 
     /** Kanallar bir kez kategorilere ayrılır; kategori değiştirmek anında olur (60 bin+ kanalda bile). */
@@ -79,7 +107,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val visibleChannels by derivedStateOf {
         when (selectedCategoryId) {
-            CAT_ALL -> allChannels
+            CAT_ALL -> shownChannels
             CAT_FAV -> favoriteChannels
             else -> channelsByCategory[selectedCategoryId] ?: emptyList()
         }
@@ -119,6 +147,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (prefs.hasAccount) {
             api = XtreamApi(prefs.server, prefs.user, prefs.pass)
             load(useCache = true)
+        }
+        // Açılıştan biraz sonra yeni sürüm var mı bak
+        viewModelScope.launch {
+            delay(4_000)
+            checkUpdate(manual = false)
         }
     }
 
@@ -230,7 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun countFor(catId: String): Int = when (catId) {
-        CAT_ALL -> allChannels.size
+        CAT_ALL -> shownChannels.size
         CAT_FAV -> favoriteChannels.size
         else -> channelsByCategory[catId]?.size ?: 0
     }
@@ -372,7 +405,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun vodCategoriesFor(series: Boolean): List<Category> {
-        val cats = if (series) seriesCats else movieCats
+        val cats = arranged(if (series) "series" else "movie", if (series) seriesCats else movieCats)
         if (cats.isEmpty()) return emptyList()
         return listOf(
             Category(CAT_SEARCH, "Ara"),
@@ -845,6 +878,135 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         livePreview = !livePreview
         prefs.livePreview = livePreview
     }
+
+    // ---- Uygulama içinden güncelleme ----
+
+    var updateInfo by mutableStateOf<UpdateInfo?>(null)
+        private set
+    /** Güncelleme penceresi açık mı */
+    var updateDialog by mutableStateOf(false)
+        private set
+    /** İndirme ilerlemesi 0..1 (null = indirilmiyor) */
+    var updateProgress by mutableStateOf<Float?>(null)
+        private set
+    var updateMessage by mutableStateOf<String?>(null)
+        private set
+    private var updateFile: java.io.File? = null
+
+    fun checkUpdate(manual: Boolean) {
+        viewModelScope.launch {
+            if (manual) updateMessage = "Kontrol ediliyor…"
+            try {
+                val info = Updater.check()
+                updateInfo = info
+                if (info != null) {
+                    updateMessage = null
+                    updateDialog = true
+                } else if (manual) {
+                    updateMessage = "En yeni sürümü kullanıyorsun (${BuildConfig.VERSION_NAME})."
+                }
+            } catch (e: Exception) {
+                if (manual) updateMessage = "Kontrol edilemedi: ${friendly(e)}"
+            }
+        }
+    }
+
+    fun dismissUpdate() {
+        updateDialog = false
+    }
+
+    fun startUpdate() {
+        val info = updateInfo ?: return
+        val ctx = getApplication<Application>()
+        if (!Updater.canInstall(ctx)) {
+            updateMessage = "Önce OzzyTV'ye uygulama yükleme izni ver, sonra geri gelip tekrar \"Güncelle\"ye bas."
+            Updater.openInstallPermission(ctx)
+            return
+        }
+        updateFile?.takeIf { it.exists() }?.let {
+            Updater.install(ctx, it)
+            return
+        }
+        if (updateProgress != null) return
+        viewModelScope.launch {
+            updateProgress = 0f
+            updateMessage = null
+            try {
+                val f = Updater.download(ctx, info) { p -> viewModelScope.launch { updateProgress = p } }
+                updateFile = f
+                updateProgress = null
+                Updater.install(ctx, f)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                updateProgress = null
+                updateMessage = "İndirilemedi: ${friendly(e)}"
+            }
+        }
+    }
+
+    // ---- Kategori düzenleme ekranı ----
+
+    var editorType by mutableStateOf("live")
+        private set
+
+    fun openCategoryEditor(type: String) {
+        editorType = type
+        if (type != "live") ensureVodCategories()
+        screen = Screen.CategoryEditor
+    }
+
+    fun closeCategoryEditor() {
+        pendingFocus = FocusTarget.Category
+        screen = Screen.Home
+    }
+
+    fun setEditorType(type: String) {
+        editorType = type
+        if (type != "live") ensureVodCategories()
+    }
+
+    fun editorCategories(type: String): List<Category> = ordered(
+        type,
+        when (type) {
+            "live" -> serverCategories
+            "movie" -> movieCats
+            else -> seriesCats
+        },
+    )
+
+    fun toggleHidden(type: String, id: String) {
+        val cur = hiddenCats[type].orEmpty()
+        val next = if (id in cur) cur - id else cur + id
+        hiddenCats[type] = next
+        prefs.setHiddenCats(type, next)
+    }
+
+    fun setAllHidden(type: String, hide: Boolean) {
+        val next = if (hide) editorCategories(type).map { it.id }.toSet() else emptySet()
+        hiddenCats[type] = next
+        prefs.setHiddenCats(type, next)
+    }
+
+    /** Kategoriyi bir yukarı (-1) / aşağı (+1) taşır; yeni sıra numarasını döner */
+    fun moveCategory(type: String, id: String, delta: Int): Int {
+        val list = editorCategories(type).map { it.id }.toMutableList()
+        val i = list.indexOf(id)
+        val j = (i + delta).coerceIn(0, list.size - 1)
+        if (i < 0 || i == j) return i
+        list.removeAt(i)
+        list.add(j, id)
+        catOrders[type] = list
+        prefs.setCatOrder(type, list)
+        return j
+    }
+
+    fun resetOrder(type: String) {
+        catOrders[type] = emptyList()
+        prefs.setCatOrder(type, emptyList())
+    }
+
+    fun channelCountIn(catId: String) = channelsByCategory[catId]?.size ?: 0
 
     fun logout() {
         loadJob?.cancel()

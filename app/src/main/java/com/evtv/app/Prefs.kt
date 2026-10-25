@@ -108,6 +108,22 @@ class Prefs(ctx: Context) {
         get() = p.getBoolean("preview", true)
         set(v) = p.edit().putBoolean("preview", v).apply()
 
+    // ---- Kategori düzeni: type = "live" / "movie" / "series" ----
+
+    fun hiddenCats(type: String): Set<String> = p.getStringSet("hide_$type", emptySet())?.toSet() ?: emptySet()
+
+    fun setHiddenCats(type: String, v: Set<String>) = p.edit().putStringSet("hide_$type", v).apply()
+
+    fun catOrder(type: String): List<String> = try {
+        val a = org.json.JSONArray(p.getString("order_$type", "[]"))
+        (0 until a.length()).map { a.getString(it) }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    fun setCatOrder(type: String, v: List<String>) =
+        p.edit().putString("order_$type", org.json.JSONArray(v).toString()).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

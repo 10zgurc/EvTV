@@ -28,6 +28,7 @@ data class MovieInfo(
     val poster: String?,
     val ext: String?,
     val tmdb: String? = null,
+    val trailer: String? = null,
 )
 
 data class Episode(
@@ -52,6 +53,7 @@ data class SeriesInfo(
     val poster: String?,
     val seasons: Map<Int, List<Episode>>,
     val tmdb: String? = null,
+    val trailer: String? = null,
 )
 
 private fun JSONObject.str(vararg keys: String): String? {
@@ -140,6 +142,7 @@ suspend fun XtreamApi.movieInfo(id: Int): MovieInfo = withContext(Dispatchers.De
         poster = info.str("movie_image", "cover_big").httpOrNull(),
         ext = data.str("container_extension"),
         tmdb = info.str("tmdb_id", "tmdb")?.takeIf { it.all(Char::isDigit) },
+        trailer = youtubeId(info.str("youtube_trailer", "trailer")),
     )
 }
 
@@ -191,6 +194,7 @@ suspend fun XtreamApi.seriesInfo(id: Int): SeriesInfo = withContext(Dispatchers.
             .mapValues { (_, v) -> v.sortedBy { it.num } }
             .toSortedMap(),
         tmdb = info.str("tmdb", "tmdb_id")?.takeIf { it.all(Char::isDigit) },
+        trailer = youtubeId(info.str("youtube_trailer", "trailer")),
     )
 }
 
@@ -212,4 +216,25 @@ private fun cleanEpisodeTitle(t: String): String {
     val m = Regex("""S\d+\s*E\d+\s*[-–:]?\s*(.*)$""", RegexOption.IGNORE_CASE).find(t)
     val rest = m?.groupValues?.get(1)?.trim()
     return if (!rest.isNullOrBlank()) rest else t
+}
+
+/** "https://youtube.com/watch?v=ID", "youtu.be/ID" veya "ID" → "ID" */
+fun youtubeId(raw: String?): String? {
+    val t = raw?.trim().orEmpty()
+    if (t.isBlank()) return null
+    Regex("""(?:v=|youtu\.be/|embed/|shorts/)([A-Za-z0-9_-]{11})""").find(t)?.let { return it.groupValues[1] }
+    return t.takeIf { Regex("""^[A-Za-z0-9_-]{11}$""").matches(it) }
+}
+
+/** Fragmanı YouTube uygulamasında (yoksa tarayıcıda) açar. */
+fun openTrailer(ctx: android.content.Context, id: String): Boolean {
+    val intents = listOf(
+        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id")),
+        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")),
+    )
+    for (i in intents) {
+        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { ctx.startActivity(i) }.isSuccess) return true
+    }
+    return false
 }
