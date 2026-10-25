@@ -70,7 +70,7 @@ fun CategoryEditor(vm: AppViewModel) {
                 Box {
                     FocusRow(
                         modifier = if (t == "live") Modifier.focusRequester(firstReq) else Modifier,
-                        fill = false, selected = t == type, onClick = { vm.setEditorType(t) },
+                        fill = false, selected = t == type, onClick = { vm.switchEditorType(t) },
                     ) { f ->
                         Text(label, color = if (f || t == type) C.text else C.sub, fontSize = 16.sp)
                     }

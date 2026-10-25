@@ -961,7 +961,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         screen = Screen.Home
     }
 
-    fun setEditorType(type: String) {
+    fun switchEditorType(type: String) {
         editorType = type
         if (type != "live") ensureVodCategories()
     }
