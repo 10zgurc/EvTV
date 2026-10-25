@@ -12,8 +12,8 @@ android {
         applicationId = "com.evtv.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0"
+        versionCode = 11
+        versionName = "1.1"
     }
 
     // Sabit imza: her yeni sürüm eskisinin üzerine kurulur, favoriler silinmez

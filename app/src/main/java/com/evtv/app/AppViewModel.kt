@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 
 enum class Screen { Login, Home, Player, Detail }
 
-enum class Section { Home, Live, Movies, Series, Settings }
+enum class Section { Home, Live, Guide, Movies, Series, Settings }
 
 const val CAT_ALL = "__all"
 const val CAT_FAV = "__fav"
@@ -834,6 +834,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 heroLoading.remove(key)
             }
         }
+    }
+
+    // ---- Kanal önizleme ----
+
+    var livePreview by mutableStateOf(prefs.livePreview)
+        private set
+
+    fun toggleLivePreview() {
+        livePreview = !livePreview
+        prefs.livePreview = livePreview
     }
 
     fun logout() {

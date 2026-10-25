@@ -103,6 +103,11 @@ class Prefs(ctx: Context) {
         get() = p.getInt("lastCh", -1)
         set(v) = p.edit().putInt("lastCh", v).apply()
 
+    /** Kanal listesinde odaklanılan kanalı küçük pencerede oynat */
+    var livePreview: Boolean
+        get() = p.getBoolean("preview", true)
+        set(v) = p.edit().putBoolean("preview", v).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

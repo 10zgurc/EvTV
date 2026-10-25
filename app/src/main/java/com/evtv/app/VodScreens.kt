@@ -101,16 +101,17 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(R.drawable.logo_wordmark),
                 contentDescription = "OzzyTV",
-                modifier = Modifier.height(36.dp).padding(end = 20.dp),
+                modifier = Modifier.height(32.dp).padding(end = 12.dp),
             )
             for (s in Section.entries) {
                 val label = when (s) {
                     Section.Home -> "Ana Sayfa"
                     Section.Live -> "Canlı TV"
+                    Section.Guide -> "Rehber"
                     Section.Movies -> "Filmler"
                     Section.Series -> "Diziler"
                     Section.Settings -> "Ayarlar"
@@ -124,8 +125,8 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
                         onFocused = { tabDeb.submit(s) },
                         onClick = { tabDeb.cancel(); vm.selectSection(s) },
                     ) { f ->
-                        Text(label, color = if (f || vm.section == s) C.text else C.sub, fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold)
+                        Text(label, color = if (f || vm.section == s) C.text else C.sub, fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold, maxLines = 1)
                     }
                 }
             }
@@ -140,6 +141,7 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
             when (vm.section) {
                 Section.Home -> HomeDashboard(vm, tabReq)
                 Section.Live -> LiveHome(vm, st.liveCats, st.liveChannels, tabReq)
+                Section.Guide -> GuideScreen(vm, st.liveCats, tabReq)
                 Section.Movies -> VodHome(vm, false, st.movieCats, st.movieGrid, tabReq)
                 Section.Series -> VodHome(vm, true, st.seriesCats, st.seriesGrid, tabReq)
                 Section.Settings -> SettingsPane(vm)
@@ -484,6 +486,10 @@ fun SettingsPane(vm: AppViewModel) {
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
 
+        FocusRow(onClick = { vm.toggleLivePreview() }) { f ->
+            Text("Kanal listesinde önizleme", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(if (vm.livePreview) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
+        }
         FocusRow(onClick = { vm.toggleStartLastChannel() }) { f ->
             Text("Açılışta son kanalı aç", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
             Text(if (vm.startLastChannel) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)

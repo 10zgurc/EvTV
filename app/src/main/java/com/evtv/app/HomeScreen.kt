@@ -265,15 +265,21 @@ private fun ChannelHeader(vm: AppViewModel, ch: Channel?) {
             vm.loadEpg(ch.streamId)
         }
     }
+    val preview = vm.livePreview && ch != null
     Row(
-        Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(14.dp)).background(C.panel).padding(16.dp),
+        Modifier.fillMaxWidth().height(if (preview) 168.dp else 110.dp).clip(RoundedCornerShape(14.dp))
+            .background(C.panel).padding(if (preview) 12.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (ch == null) {
             Text("Bir kanal seç", color = C.sub, fontSize = 18.sp, modifier = Modifier.weight(1f))
         } else {
-            Logo(ch, 120, 72)
+            if (preview) {
+                LivePreview(vm, ch, Modifier.size(256.dp, 144.dp).clip(RoundedCornerShape(10.dp)))
+            } else {
+                Logo(ch, 120, 72)
+            }
             Column(Modifier.weight(1f)) {
                 Text(
                     ch.name, color = C.text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,

@@ -69,6 +69,7 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
 
     val tiles = listOf(
         TileSpec("t_live", "📺", "Canlı TV", "${vm.countFor(CAT_ALL)} kanal", Color(0xFF2B6BFF), Color(0xFF1B3FA8)),
+        TileSpec("t_guide", "📅", "Rehber", "Saat saat yayın akışı", Color(0xFFF59E0B), Color(0xFF9A5B00)),
         TileSpec("t_movies", "🎬", "Filmler", "Kategoriler, arama, listem", Color(0xFFE5484D), Color(0xFF8E1F2B)),
         TileSpec("t_series", "🍿", "Diziler", "Sezonlar ve bölümler", Color(0xFF8B5CF6), Color(0xFF4C2A9E)),
         TileSpec("t_search", "🔍", "Ara", "Film veya dizi bul", Color(0xFF14B8A6), Color(0xFF0B6B61)),
@@ -158,6 +159,7 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
                                 vm.pendingFocus = FocusTarget.Category
                                 when (t.key) {
                                     "t_live" -> vm.selectSection(Section.Live)
+                                    "t_guide" -> vm.selectSection(Section.Guide)
                                     "t_movies" -> vm.selectSection(Section.Movies)
                                     "t_series" -> vm.selectSection(Section.Series)
                                     "t_search" -> {

@@ -192,7 +192,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
     /** Kanalın şu anki ve sıradaki programları. */
     suspend fun shortEpg(streamId: Int): List<EpgItem> {
         val o = try {
-            JSONObject(fetchText("&action=get_short_epg&stream_id=$streamId&limit=6"))
+            JSONObject(fetchText("&action=get_short_epg&stream_id=$streamId&limit=12"))
         } catch (e: org.json.JSONException) {
             return emptyList()
         }

@@ -6,7 +6,12 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 - Büyük kutular (Canlı TV, Filmler, Diziler, Ara, Ayarlar), odaklanılan filmin büyük arka plan görseli
 - Satırlar: İzlemeye devam et, Favori kanallar, Listem, Yeni filmler, Yeni diziler
 
+## Rehber
+- Saat saat yayın akışı ızgarası (2 saatlik pencere; kenarda sağ/sol ile zaman kayar)
+- Şu an yayında olan programa basınca kanal açılır
+
 ## Canlı TV
+- Kanal listesinde odaklanılan kanalın küçük canlı önizlemesi (Ayarlar'dan kapatılabilir)
 - Xtream Codes ile giriş (bilgiler TV'de saklanır). Sağlayıcının M3U linkini sunucu alanına yapıştırırsan kullanıcı adı/şifre otomatik alınır.
 - Solda kategoriler, sağda logolu kanal listesi
 - Üstte odaktaki kanalın **şimdi / sonra** yayın akışı (15 dakikada bir tazelenir)
