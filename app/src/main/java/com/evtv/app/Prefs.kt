@@ -53,6 +53,32 @@ class Prefs(ctx: Context) {
         get() = p.getInt("subSize", 1)
         set(v) = p.edit().putInt("subSize", v).apply()
 
+    // ---- İnternetten altyazı (OpenSubtitles.com) ----
+    var osKey: String
+        get() = p.getString("osKey", "") ?: ""
+        set(v) = p.edit().putString("osKey", v.trim()).remove("osToken").apply()
+
+    var osUser: String
+        get() = p.getString("osUser", "") ?: ""
+        set(v) = p.edit().putString("osUser", v.trim()).remove("osToken").apply()
+
+    var osPass: String
+        get() = p.getString("osPass", "") ?: ""
+        set(v) = p.edit().putString("osPass", v).remove("osToken").apply()
+
+    /** Videoda istenen dilde altyazı yoksa otomatik indir */
+    var osAuto: Boolean
+        get() = p.getBoolean("osAuto", true)
+        set(v) = p.edit().putBoolean("osAuto", v).apply()
+
+    var osToken: String
+        get() = p.getString("osToken", "") ?: ""
+        set(v) = p.edit().putString("osToken", v).putLong("osTokenTime", System.currentTimeMillis()).apply()
+
+    val osTokenAge: Long get() = System.currentTimeMillis() - p.getLong("osTokenTime", 0)
+
+    val osConfigured: Boolean get() = osKey.isNotBlank() && osUser.isNotBlank() && osPass.isNotBlank()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

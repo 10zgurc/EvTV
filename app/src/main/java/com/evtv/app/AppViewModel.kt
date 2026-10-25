@@ -539,6 +539,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 url = a.movieUrl(item.id, ext),
                 startMs = if (fromStart) 0L else watch.position(key),
                 hasNext = false,
+                meta = cleanTitle(item.name).let { (t, y) -> SubMeta(t, movieInfo?.year ?: y, movieInfo?.tmdb) },
             )
         )
         vodLaunchToken++
@@ -573,6 +574,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 url = a.episodeUrl(e.id, e.ext),
                 startMs = if (i == 0 && !fromStart) watch.position(key) else 0L,
                 hasNext = i < rest.size - 1,
+                meta = SubMeta(cleanTitle(seriesInfo?.name ?: item.name).first, null, seriesInfo?.tmdb, e.season, e.num),
             )
         }
         onEpisodeStarted(ep.id)
@@ -685,6 +687,47 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---- İnternetten altyazı ayarları ----
+
+    var osKey by mutableStateOf(prefs.osKey)
+        private set
+    var osUser by mutableStateOf(prefs.osUser)
+        private set
+    var osPass by mutableStateOf(prefs.osPass)
+        private set
+    var osAuto by mutableStateOf(prefs.osAuto)
+        private set
+    var osTestResult by mutableStateOf<String?>(null)
+        private set
+
+    fun updateOs(key: String = osKey, user: String = osUser, pass: String = osPass) {
+        if (key != osKey) { osKey = key; prefs.osKey = key }
+        if (user != osUser) { osUser = user; prefs.osUser = user }
+        if (pass != osPass) { osPass = pass; prefs.osPass = pass }
+        osTestResult = null
+    }
+
+    fun toggleOsAuto() {
+        osAuto = !osAuto
+        prefs.osAuto = osAuto
+    }
+
+    fun testOpenSubtitles() {
+        if (!prefs.osConfigured) {
+            osTestResult = "Önce üç alanı da doldur."
+            return
+        }
+        osTestResult = "Deneniyor…"
+        viewModelScope.launch {
+            osTestResult = try {
+                OpenSubtitles(getApplication<Application>(), prefs).token(forceNew = true)
+                "✓ Bağlantı başarılı. Altyazılar artık otomatik bulunacak."
+            } catch (e: Exception) {
+                "✗ " + (e.message ?: "Bağlanılamadı")
+            }
+        }
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()
@@ -720,4 +763,5 @@ data class VodPlay(
     val url: String,
     val startMs: Long,
     val hasNext: Boolean,
+    val meta: SubMeta? = null,
 )

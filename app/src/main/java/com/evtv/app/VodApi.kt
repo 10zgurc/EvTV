@@ -27,6 +27,7 @@ data class MovieInfo(
     val backdrop: String?,
     val poster: String?,
     val ext: String?,
+    val tmdb: String? = null,
 )
 
 data class Episode(
@@ -50,6 +51,7 @@ data class SeriesInfo(
     val backdrop: String?,
     val poster: String?,
     val seasons: Map<Int, List<Episode>>,
+    val tmdb: String? = null,
 )
 
 private fun JSONObject.str(vararg keys: String): String? {
@@ -137,6 +139,7 @@ suspend fun XtreamApi.movieInfo(id: Int): MovieInfo = withContext(Dispatchers.De
         backdrop = info.str("backdrop_path", "backdrop").httpOrNull(),
         poster = info.str("movie_image", "cover_big").httpOrNull(),
         ext = data.str("container_extension"),
+        tmdb = info.str("tmdb_id", "tmdb")?.takeIf { it.all(Char::isDigit) },
     )
 }
 
@@ -187,6 +190,7 @@ suspend fun XtreamApi.seriesInfo(id: Int): SeriesInfo = withContext(Dispatchers.
             .groupBy { it.season }
             .mapValues { (_, v) -> v.sortedBy { it.num } }
             .toSortedMap(),
+        tmdb = info.str("tmdb", "tmdb_id")?.takeIf { it.all(Char::isDigit) },
     )
 }
 

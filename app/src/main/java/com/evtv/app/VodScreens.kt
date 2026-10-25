@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -401,7 +403,7 @@ fun SearchPane(
 
 @Composable
 fun SettingsPane(vm: AppViewModel) {
-    Column(Modifier.width(560.dp).fillMaxHeight()) {
+    Column(Modifier.width(640.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         Text("Altyazı", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
         FocusRow(onClick = { vm.cycleSubtitleLang() }) { f ->
             Text("Otomatik altyazı dili", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
@@ -427,6 +429,37 @@ fun SettingsPane(vm: AppViewModel) {
         }
         Text(
             "İzlerken altyazıyı veya ses dilini değiştirmek için orta tuşla kontrolleri aç, CC veya ayar (⚙) düğmesine bas.",
+            color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
+        )
+
+        Text("İnternetten altyazı (OpenSubtitles.com)", color = C.accent, fontSize = 16.sp,
+            modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
+        Text(
+            "Videoda Türkçe altyazı yoksa internetten otomatik bulur. opensubtitles.com'da ücretsiz hesap aç, " +
+                "Profil → API Consumers bölümünden bir API anahtarı oluştur ve aşağıya gir. " +
+                "İpucu: uzun anahtarı yazmak için telefondaki Google TV uygulamasının klavyesini kullanabilirsin.",
+            color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, bottom = 8.dp),
+        )
+        val fm = androidx.compose.ui.platform.LocalFocusManager.current
+        Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TvField("API anahtarı", vm.osKey, { vm.updateOs(key = it) }, fm)
+            TvField("OpenSubtitles kullanıcı adı", vm.osUser, { vm.updateOs(user = it) }, fm)
+            TvField("OpenSubtitles şifresi", vm.osPass, { vm.updateOs(pass = it) }, fm,
+                androidx.compose.ui.text.input.KeyboardType.Password, password = true, last = true)
+        }
+        FocusRow(onClick = { vm.toggleOsAuto() }) { f ->
+            Text("Otomatik altyazı indir", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(if (vm.osAuto) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
+        }
+        FocusRow(onClick = { vm.testOpenSubtitles() }) {
+            Text("Bağlantıyı test et", color = C.text, fontSize = 17.sp)
+        }
+        vm.osTestResult?.let {
+            Text(it, color = if (it.startsWith("✗")) C.error else C.sub, fontSize = 15.sp,
+                modifier = Modifier.padding(start = 14.dp, top = 2.dp))
+        }
+        Text(
+            "İzlerken menü tuşuna basarak ya da kontrollerin üstündeki \"İnternetten altyazı\" düğmesiyle elle de seçebilirsin.",
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
 
