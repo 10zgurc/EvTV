@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -84,6 +89,8 @@ fun PlayerScreen(vm: AppViewModel) {
     var showInfo by remember { mutableStateOf(true) }
     var digits by remember { mutableStateOf("") }
     var toast by remember { mutableStateOf<String?>(null) }
+    /** Orta tuşla açılan yan kanal listesi */
+    var listOpen by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
 
     val exo = remember {
@@ -231,10 +238,12 @@ fun PlayerScreen(vm: AppViewModel) {
         }
     }
 
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // Liste kapanınca odak tekrar oynatıcıya
+    LaunchedEffect(listOpen) { if (!listOpen) runCatching { focus.requestFocus() } }
 
     BackHandler {
         when {
+            listOpen -> listOpen = false
             digits.isNotEmpty() -> digits = ""
             else -> vm.backFromPlayer()
         }
@@ -247,6 +256,8 @@ fun PlayerScreen(vm: AppViewModel) {
             .focusRequester(focus)
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                // Liste açıkken tuşlar listede gezinsin
+                if (listOpen) return@onKeyEvent false
                 val code = e.nativeKeyEvent.keyCode
                 when (code) {
                     AndroidKey.KEYCODE_DPAD_UP, AndroidKey.KEYCODE_CHANNEL_UP -> { vm.zap(1); true }
@@ -255,15 +266,20 @@ fun PlayerScreen(vm: AppViewModel) {
                         if (!vm.previous()) toast = "Önceki kanal yok"
                         true
                     }
-                    AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER,
-                    AndroidKey.KEYCODE_NUMPAD_ENTER, AndroidKey.KEYCODE_INFO, AndroidKey.KEYCODE_DPAD_RIGHT -> {
+                    AndroidKey.KEYCODE_DPAD_CENTER, AndroidKey.KEYCODE_ENTER, AndroidKey.KEYCODE_NUMPAD_ENTER -> {
                         if (errorText != null) {
                             // Hata ekranında orta tuş = tekrar dene
                             ps.retries = 0
                             ps.triedOtherExt = false
                             ps.ext = vm.streamExt
                             reloadKey++
-                        } else infoTick++
+                        } else if (e.nativeKeyEvent.repeatCount == 0) {
+                            listOpen = true
+                        }
+                        true
+                    }
+                    AndroidKey.KEYCODE_INFO, AndroidKey.KEYCODE_DPAD_RIGHT -> {
+                        infoTick++
                         true
                     }
                     AndroidKey.KEYCODE_MENU, AndroidKey.KEYCODE_BOOKMARK -> {
@@ -323,8 +339,15 @@ fun PlayerScreen(vm: AppViewModel) {
             )
         }
 
+        if (listOpen) {
+            ChannelListOverlay(vm, Modifier.align(Alignment.CenterStart)) { i ->
+                vm.playAt(i)
+                listOpen = false
+            }
+        }
+
         AnimatedVisibility(
-            visible = showInfo,
+            visible = showInfo && !listOpen,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -366,4 +389,55 @@ private class PlayAttempt {
     var ext = "ts"
     var triedOtherExt = false
     var retries = 0
+}
+
+/** İzlerken orta tuşla açılan kanal listesi; ana menüye dönmeden kanal değiştirilir. */
+@Composable
+private fun ChannelListOverlay(vm: AppViewModel, modifier: Modifier, onPick: (Int) -> Unit) {
+    val list = vm.playList
+    val current = vm.playingIndex
+    val state = androidx.compose.foundation.lazy.rememberLazyListState(
+        initialFirstVisibleItemIndex = (current - 4).coerceAtLeast(0)
+    )
+    val currentReq = remember { FocusRequester() }
+    var focusedCh by remember { mutableStateOf(vm.playing) }
+    LaunchedEffect(Unit) { focusWhenReady { currentReq } }
+    LaunchedEffect(focusedCh?.streamId) {
+        focusedCh?.let {
+            delay(400)
+            vm.loadEpg(it.streamId)
+        }
+    }
+    Column(
+        modifier
+            .fillMaxHeight()
+            .width(480.dp)
+            .background(Brush.horizontalGradient(listOf(Color(0xF20E1014), Color(0xE60E1014), Color(0x000E1014))))
+            .padding(start = 28.dp, top = 24.dp, end = 40.dp, bottom = 16.dp),
+    ) {
+        val ch = focusedCh
+        if (ch != null) {
+            Text(ch.name, color = C.text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            EpgLines(vm.epg[ch.streamId], vm.now)
+        }
+        Spacer(Modifier.height(10.dp))
+        androidx.compose.foundation.lazy.LazyColumn(state = state, modifier = Modifier.weight(1f)) {
+            items(list.size, key = { list[it].streamId }) { i ->
+                val c = list[i]
+                FocusRow(
+                    modifier = if (i == current) Modifier.focusRequester(currentReq) else Modifier,
+                    selected = i == current,
+                    onFocused = { focusedCh = c },
+                    onClick = { onPick(i) },
+                ) { f ->
+                    Text("${c.num}", color = if (f) C.text else C.sub, fontSize = 14.sp, modifier = Modifier.width(44.dp))
+                    Logo(c, 52, 32)
+                    Text(c.name, color = C.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f))
+                    if (vm.isFavorite(c.streamId)) Text("★", color = C.star, fontSize = 15.sp)
+                }
+            }
+        }
+        Text("Orta tuş: aç  •  Geri: kapat", color = C.sub, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+    }
 }

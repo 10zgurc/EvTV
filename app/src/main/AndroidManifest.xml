@@ -9,8 +9,8 @@
 
     <application
         android:name=".EvTvApplication"
-        android:label="EvTV"
-        android:icon="@drawable/ic_launcher"
+        android:label="OzzyTV"
+        android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"
         android:largeHeap="true"

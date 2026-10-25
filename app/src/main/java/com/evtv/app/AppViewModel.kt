@@ -20,12 +20,13 @@ import kotlinx.coroutines.withContext
 
 enum class Screen { Login, Home, Player, Detail }
 
-enum class Section { Live, Movies, Series, Settings }
+enum class Section { Home, Live, Movies, Series, Settings }
 
 const val CAT_ALL = "__all"
 const val CAT_FAV = "__fav"
 const val CAT_RECENT = "__recent"
 const val CAT_SEARCH = "__search"
+const val CAT_MYLIST = "__mylist"
 
 private const val EPG_MAX_AGE = 15 * 60_000L
 
@@ -203,9 +204,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private var autoStarted = false
+
     private fun applyLists(cats: List<Category>, chans: List<Channel>) {
         serverCategories = cats
         allChannels = chans
+        if (!autoStarted && prefs.startLastChannel && screen == Screen.Home) {
+            autoStarted = true
+            chans.firstOrNull { it.streamId == prefs.lastChannelId }?.let { ch ->
+                val list = chans.filter { it.categoryId == ch.categoryId }.ifEmpty { chans }
+                play(ch, list)
+            }
+        }
         val valid = selectedCategoryId == CAT_ALL || selectedCategoryId == CAT_FAV ||
             cats.any { it.id == selectedCategoryId }
         if (!valid) selectCategory(CAT_ALL)
@@ -243,6 +253,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playingIndex = list.indexOfFirst { it.streamId == channel.streamId }.coerceAtLeast(0)
         previousChannel = null
         lastChannelId = channel.streamId
+        prefs.lastChannelId = channel.streamId
         screen = Screen.Player
     }
 
@@ -251,6 +262,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playingIndex = index
         if (old != null && old.streamId != playing?.streamId) previousChannel = old
         lastChannelId = playing?.streamId
+        playing?.let { prefs.lastChannelId = it.streamId }
     }
 
     fun zap(delta: Int) {
@@ -319,10 +331,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // Filmler ve diziler
     // =====================================================================
 
-    var section by mutableStateOf(
-        runCatching { Section.valueOf(prefs.lastSection) }.getOrDefault(Section.Live)
-            .let { if (it == Section.Settings) Section.Live else it }
-    )
+    /** Uygulama her zaman Ana Sayfa ile açılır */
+    var section by mutableStateOf(Section.Home)
         private set
 
     var movieCats by mutableStateOf<List<Category>>(emptyList())
@@ -350,19 +360,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ana ekrana dönünce odaklanılacak film/dizi. */
     var lastVodId: Int? = null
+    /** Ana Sayfa'da en son tıklanan öğe (geri dönünce odak için) */
+    var homeLastKey: String? = null
     var vodFocusPending by mutableStateOf(false)
 
     fun selectSection(s: Section) {
         if (section == s) return
         section = s
         if (s != Section.Settings) prefs.lastSection = s.name
-        if (s == Section.Movies || s == Section.Series) ensureVodCategories()
+        if (s == Section.Movies || s == Section.Series || s == Section.Home) ensureVodCategories()
     }
 
     fun vodCategoriesFor(series: Boolean): List<Category> {
         val cats = if (series) seriesCats else movieCats
         if (cats.isEmpty()) return emptyList()
-        return listOf(Category(CAT_SEARCH, "Ara"), Category(CAT_RECENT, "İzlemeye devam et")) + cats
+        return listOf(
+            Category(CAT_SEARCH, "Ara"),
+            Category(CAT_RECENT, "İzlemeye devam et"),
+            Category(CAT_MYLIST, "Listem"),
+        ) + cats
     }
 
     fun selectedVodCat(series: Boolean) = if (series) selectedSeriesCat else selectedMovieCat
@@ -378,7 +394,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             prefs.lastMovieCat = id
         }
         when (id) {
-            CAT_RECENT -> {}
+            CAT_RECENT, CAT_MYLIST -> {}
             CAT_SEARCH -> prepareSearch(series)
             else -> loadVodItems(series, id)
         }
@@ -407,14 +423,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // Kayıtlı kategori artık yoksa "İzlemeye devam et" ya da ilk kategori
                 fun pick(cur: String, cats: List<Category>, series: Boolean): String = when {
                     cur == CAT_RECENT && watch.recents(series).isNotEmpty() -> cur
+                    cur == CAT_MYLIST && watch.myList(series).isNotEmpty() -> cur
                     cats.any { it.id == cur } -> cur
                     watch.recents(series).isNotEmpty() -> CAT_RECENT
                     else -> cats.firstOrNull()?.id ?: ""
                 }
                 selectedMovieCat = pick(selectedMovieCat, movieCats, false).also { prefs.lastMovieCat = it }
                 selectedSeriesCat = pick(selectedSeriesCat, seriesCats, true).also { prefs.lastSeriesCat = it }
-                if (selectedMovieCat.isNotBlank() && selectedMovieCat != CAT_RECENT) loadVodItems(false, selectedMovieCat)
-                if (selectedSeriesCat.isNotBlank() && selectedSeriesCat != CAT_RECENT) loadVodItems(true, selectedSeriesCat)
+                if (selectedMovieCat.isNotBlank() && !selectedMovieCat.startsWith("__")) loadVodItems(false, selectedMovieCat)
+                if (selectedSeriesCat.isNotBlank() && !selectedSeriesCat.startsWith("__")) loadVodItems(true, selectedSeriesCat)
+                // Ana sayfadaki "yeni" satırları
+                featuredCategory(false)?.let { loadVodItems(false, it) }
+                featuredCategory(true)?.let { loadVodItems(true, it) }
             } finally {
                 vodCatsLoading = false
             }
@@ -430,6 +450,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return watch.recents(series)
         }
         if (cat == CAT_SEARCH) return searchResults[series] ?: emptyList()
+        if (cat == CAT_MYLIST) {
+            watchVersion
+            return watch.myList(series)
+        }
         return vodItems[vodKey(series, cat)]
     }
 
@@ -753,6 +777,63 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun closeReport() {
         reportText = null
+    }
+
+    // ---- Listem / Ana Sayfa yardımcıları ----
+
+    fun inMyList(item: VodItem): Boolean {
+        watchVersion
+        return watch.inMyList(item)
+    }
+
+    fun toggleMyList(item: VodItem): Boolean {
+        val r = watch.toggleMyList(item)
+        watchVersion++
+        return r
+    }
+
+    /** Oynatıcıdaki kanal listesinden seçim */
+    fun playAt(index: Int) {
+        if (index in playList.indices) setPlaying(index)
+    }
+
+    val favoriteChannelList: List<Channel> get() = favoriteChannels
+
+    var startLastChannel by mutableStateOf(prefs.startLastChannel)
+        private set
+
+    fun toggleStartLastChannel() {
+        startLastChannel = !startLastChannel
+        prefs.startLastChannel = startLastChannel
+    }
+
+    /** Ana sayfadaki "yeni" satırı için uygun kategori: adında yeni/new/son geçen, yoksa ilki */
+    fun featuredCategory(series: Boolean): String? {
+        val cats = if (series) seriesCats else movieCats
+        val re = Regex("(yeni|new|son ekle|latest|recent|2026|2025)", RegexOption.IGNORE_CASE)
+        return (cats.firstOrNull { re.containsMatchIn(it.name) } ?: cats.firstOrNull())?.id
+    }
+
+    /** Ana sayfada odaklanılan öğenin arka plan resmi (film detayından, önbellekli) */
+    val heroBackdrops = mutableStateMapOf<String, String>()
+    private val heroLoading = HashSet<String>()
+
+    fun loadHeroBackdrop(item: VodItem) {
+        val a = api ?: return
+        val key = (if (item.isSeries) "s" else "m") + item.id
+        if (heroBackdrops.containsKey(key) || !heroLoading.add(key)) return
+        viewModelScope.launch {
+            try {
+                val bd = if (item.isSeries) a.seriesInfo(item.id).backdrop else a.movieInfo(item.id).backdrop
+                heroBackdrops[key] = bd ?: item.poster ?: ""
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                heroBackdrops[key] = item.poster ?: ""
+            } finally {
+                heroLoading.remove(key)
+            }
+        }
     }
 
     fun logout() {

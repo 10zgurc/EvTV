@@ -27,7 +27,9 @@ jobs:
           ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          cp app/build/outputs/apk/release/app-release.apk "EvTV-$VERSION.apk"
+          cp app/build/outputs/apk/release/app-release.apk "OzzyTV-$VERSION.apk"
+          cp app/build/outputs/apk/release/app-release.apk OzzyTV.apk
+          # Eski sabit link de çalışmaya devam etsin
           cp app/build/outputs/apk/release/app-release.apk EvTV.apk
 
       - name: Hataları özetle
@@ -39,8 +41,8 @@ jobs:
       - name: APK'yı indirilebilir dosya olarak yükle
         uses: actions/upload-artifact@v4
         with:
-          name: EvTV-${{ env.VERSION }}
-          path: EvTV-${{ env.VERSION }}.apk
+          name: OzzyTV-${{ env.VERSION }}
+          path: OzzyTV-${{ env.VERSION }}.apk
 
       - name: "Yayınla: sabit link (latest) + sürüm numaralı"
         env:
@@ -48,10 +50,10 @@ jobs:
         run: |
           # Sabit link her zaman en yeni sürüm: .../releases/download/latest/EvTV.apk
           gh release delete latest -y --cleanup-tag || true
-          gh release create latest EvTV.apk "EvTV-$VERSION.apk" -t "EvTV $VERSION (en yeni)" -n "Sürüm $VERSION • derleme ${GITHUB_SHA::7}"
+          gh release create latest OzzyTV.apk "OzzyTV-$VERSION.apk" EvTV.apk -t "OzzyTV $VERSION (en yeni)" -n "Sürüm $VERSION • derleme ${GITHUB_SHA::7}"
           # Her sürüm ayrıca kalıcı olarak saklanır (gerekirse eskiye dönmek için)
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" "EvTV-$VERSION.apk" --clobber
+            gh release upload "v$VERSION" "OzzyTV-$VERSION.apk" --clobber
           else
-            gh release create "v$VERSION" "EvTV-$VERSION.apk" -t "EvTV $VERSION" -n "Derleme ${GITHUB_SHA::7}" --latest=false
+            gh release create "v$VERSION" "OzzyTV-$VERSION.apk" -t "OzzyTV $VERSION" -n "Derleme ${GITHUB_SHA::7}" --latest=false
           fi

@@ -60,6 +60,26 @@ class WatchStore(ctx: Context) {
         saveRecents(loadRecents().filterNot { it.item.id == item.id && it.item.isSeries == item.isSeries })
     }
 
+    // ---- Listem (film/dizi favorileri) ----
+
+    fun myList(series: Boolean): List<VodItem> = loadList("mylist").filter { it.item.isSeries == series }.map { it.item }
+
+    fun allMyList(): List<VodItem> = loadList("mylist").map { it.item }
+
+    fun inMyList(item: VodItem) = loadList("mylist").any { it.item.id == item.id && it.item.isSeries == item.isSeries }
+
+    /** Ekler ya da çıkarır; sonuç: listede mi */
+    fun toggleMyList(item: VodItem): Boolean {
+        val list = loadList("mylist").toMutableList()
+        val i = list.indexOfFirst { it.item.id == item.id && it.item.isSeries == item.isSeries }
+        val added = if (i >= 0) { list.removeAt(i); false } else { list.add(0, RecentItem(item, System.currentTimeMillis())); true }
+        saveList("mylist", list.take(300))
+        return added
+    }
+
+    /** Film ve diziler karışık, en son izlenen önce. */
+    fun allRecents(): List<VodItem> = loadRecents().map { it.item }
+
     /** Dizide en son izlenen bölümün kimliği. */
     fun lastEpisode(seriesId: Int): String? = recent.getString("last_ep_$seriesId", null)
 
@@ -67,8 +87,10 @@ class WatchStore(ctx: Context) {
         recent.edit().putString("last_ep_$seriesId", episodeId).apply()
     }
 
-    private fun loadRecents(): List<RecentItem> = try {
-        val arr = JSONArray(recent.getString("list", "[]"))
+    private fun loadRecents(): List<RecentItem> = loadList("list")
+
+    private fun loadList(key: String): List<RecentItem> = try {
+        val arr = JSONArray(recent.getString(key, "[]"))
         (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
             RecentItem(
@@ -87,7 +109,9 @@ class WatchStore(ctx: Context) {
         emptyList()
     }
 
-    private fun saveRecents(list: List<RecentItem>) {
+    private fun saveRecents(list: List<RecentItem>) = saveList("list", list)
+
+    private fun saveList(key: String, list: List<RecentItem>) {
         val arr = JSONArray()
         for (r in list) {
             arr.put(
@@ -101,7 +125,7 @@ class WatchStore(ctx: Context) {
                     .put("t", r.time)
             )
         }
-        recent.edit().putString("list", arr.toString()).apply()
+        recent.edit().putString(key, arr.toString()).apply()
     }
 
     fun clear() {

@@ -77,7 +77,7 @@ class EvTvApplication : Application() {
 
         fun writeReport(app: Application, kind: String, body: String) {
             val time = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault()).format(Date())
-            val header = "EvTV ${BuildConfig.VERSION_NAME} • ${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE} • $time"
+            val header = "OzzyTV ${BuildConfig.VERSION_NAME} • ${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE} • $time"
             reportFile(app, kind).writeText(sanitize(app, "$header\n$body"))
         }
 

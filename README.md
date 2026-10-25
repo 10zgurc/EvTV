@@ -1,8 +1,12 @@
-# EvTV — Android TV için kişisel IPTV oynatıcı
+# OzzyTV — Android TV için kişisel IPTV oynatıcı
 
 Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 
-## Şu an neler var
+## Ana Sayfa
+- Büyük kutular (Canlı TV, Filmler, Diziler, Ara, Ayarlar), odaklanılan filmin büyük arka plan görseli
+- Satırlar: İzlemeye devam et, Favori kanallar, Listem, Yeni filmler, Yeni diziler
+
+## Canlı TV
 - Xtream Codes ile giriş (bilgiler TV'de saklanır). Sağlayıcının M3U linkini sunucu alanına yapıştırırsan kullanıcı adı/şifre otomatik alınır.
 - Solda kategoriler, sağda logolu kanal listesi
 - Üstte odaktaki kanalın **şimdi / sonra** yayın akışı (15 dakikada bir tazelenir)
@@ -18,7 +22,8 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 | Yukarı / CH+ | Sonraki kanal |
 | Aşağı / CH− | Önceki kanal |
 | Sol | Bir önceki izlediğin kanala dön |
-| Orta tuş, Sağ veya Info | Kanal bilgisini göster (hata ekranında: tekrar dene) |
+| Orta tuş | Yan kanal listesini aç (hata ekranında: tekrar dene) |
+| Sağ veya Info | Kanal bilgisini göster |
 | Rakamlar | Kanal numarasıyla geçiş |
 | Menü | Favoriye ekle/çıkar |
 | Geri | Listeye dön |

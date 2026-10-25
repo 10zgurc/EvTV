@@ -94,6 +94,15 @@ class Prefs(ctx: Context) {
         get() = p.getInt("buffer", 1)
         set(v) = p.edit().putInt("buffer", v).apply()
 
+    /** Açılışta son izlenen kanalı otomatik aç */
+    var startLastChannel: Boolean
+        get() = p.getBoolean("startLast", false)
+        set(v) = p.edit().putBoolean("startLast", v).apply()
+
+    var lastChannelId: Int
+        get() = p.getInt("lastCh", -1)
+        set(v) = p.edit().putInt("lastCh", v).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

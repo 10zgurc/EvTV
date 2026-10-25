@@ -57,7 +57,11 @@ fun LoginScreen(vm: AppViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("EvTV", color = C.accent, fontSize = 44.sp, fontWeight = FontWeight.Bold)
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(R.drawable.logo_wordmark),
+            contentDescription = "OzzyTV",
+            modifier = Modifier.height(72.dp).padding(bottom = 8.dp),
+        )
         Text("Xtream Codes bilgilerini gir ya da sağlayıcının M3U linkini sunucu alanına yapıştır", color = C.sub, fontSize = 17.sp)
         Spacer(Modifier.height(28.dp))
 

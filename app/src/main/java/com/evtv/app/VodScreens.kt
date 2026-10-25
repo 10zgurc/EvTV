@@ -95,10 +95,14 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("EvTV", color = C.accent, fontSize = 28.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(end = 20.dp))
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.logo_wordmark),
+                contentDescription = "OzzyTV",
+                modifier = Modifier.height(36.dp).padding(end = 20.dp),
+            )
             for (s in Section.entries) {
                 val label = when (s) {
+                    Section.Home -> "Ana Sayfa"
                     Section.Live -> "Canlı TV"
                     Section.Movies -> "Filmler"
                     Section.Series -> "Diziler"
@@ -127,6 +131,7 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
         Spacer(Modifier.height(14.dp))
         Box(Modifier.weight(1f)) {
             when (vm.section) {
+                Section.Home -> HomeDashboard(vm, tabReq)
                 Section.Live -> LiveHome(vm, st.liveCats, st.liveChannels, tabReq)
                 Section.Movies -> VodHome(vm, false, st.movieCats, st.movieGrid, tabReq)
                 Section.Series -> VodHome(vm, true, st.seriesCats, st.seriesGrid, tabReq)
@@ -221,6 +226,7 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                     Text(
                         when (cat.id) {
                             CAT_RECENT -> "▶ "
+                            CAT_MYLIST -> "★ "
                             CAT_SEARCH -> "🔍 "
                             else -> ""
                         } + cat.name,
@@ -229,6 +235,7 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                     )
                     val n = when (cat.id) {
                         CAT_RECENT -> vm.watch.recents(series).size
+                        CAT_MYLIST -> vm.watch.myList(series).size
                         CAT_SEARCH -> null
                         else -> vm.vodItems[vm.vodKey(series, cat.id)]?.size
                     }
@@ -255,11 +262,22 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                 }
                 list.orEmpty().isEmpty() -> CenterBox {
                     Text(
-                        if (selected == CAT_RECENT) "Henüz bir şey izlemedin." else "Bu kategori boş.",
+                        when (selected) {
+                            CAT_RECENT -> "Henüz bir şey izlemedin."
+                            CAT_MYLIST -> "Listen boş. Bir film/dizinin sayfasında \"Listeme ekle\"ye bas."
+                            else -> "Bu kategori boş."
+                        },
                         color = C.sub, fontSize = 17.sp,
                     )
                 }
-                else -> PosterGrid(vm, series, list.orEmpty(), grid, itemReq, selected == CAT_RECENT)
+                else -> PosterGrid(
+                    vm, series, list.orEmpty(), grid, itemReq,
+                    onLong = when (selected) {
+                        CAT_RECENT -> { item -> vm.removeFromRecents(item) }
+                        CAT_MYLIST -> { item -> vm.toggleMyList(item) }
+                        else -> null
+                    },
+                )
             }
         }
     }
@@ -273,7 +291,7 @@ fun PosterGrid(
     list: List<VodItem>,
     grid: LazyGridState,
     itemReq: HashMap<Int, FocusRequester>,
-    removable: Boolean,
+    onLong: ((VodItem) -> Unit)?,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(6),
@@ -294,7 +312,7 @@ fun PosterGrid(
                 progress = if (series) 0f else vm.watch.progress("m${item.id}"),
                 modifier = Modifier.focusRequester(fr),
                 onClick = { vm.openDetail(item) },
-                onLongClick = if (removable) ({ vm.removeFromRecents(item) }) else null,
+                onLongClick = onLong?.let { f -> { f(item) } },
             )
         }
     }
@@ -401,7 +419,7 @@ fun SearchPane(
                 FocusRow(onClick = { vm.prepareSearch(series, force = true) }) { Text("Tekrar dene", color = C.text) }
             }
         }
-        if (results.isNotEmpty()) PosterGrid(vm, series, results, grid, itemReq, removable = false)
+        if (results.isNotEmpty()) PosterGrid(vm, series, results, grid, itemReq, onLong = null)
     }
 }
 
@@ -451,6 +469,12 @@ fun SettingsPane(vm: AppViewModel) {
             "Donma oluyorsa \"Çok yüksek\" seç: kanal/film birkaç saniye geç açılır ama internet anlık yavaşladığında görüntü durmaz.",
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
+
+        FocusRow(onClick = { vm.toggleStartLastChannel() }) { f ->
+            Text("Açılışta son kanalı aç", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(if (vm.startLastChannel) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
+        }
+        Spacer(Modifier.height(20.dp))
 
         Text("Altyazı", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
         LanguagePicker("Birinci altyazı dili", vm.subtitleLang, allowOff = true) { vm.setSubtitleLanguage(it) }
@@ -517,7 +541,7 @@ fun SettingsPane(vm: AppViewModel) {
         }
         LogoutRow(vm)
         Spacer(Modifier.height(20.dp))
-        Text("EvTV ${BuildConfig.VERSION_NAME}", color = C.sub, fontSize = 13.sp, modifier = Modifier.padding(start = 14.dp))
+        Text("OzzyTV ${BuildConfig.VERSION_NAME}", color = C.sub, fontSize = 13.sp, modifier = Modifier.padding(start = 14.dp))
     }
 }
 
@@ -639,6 +663,12 @@ private fun ActionButton(text: String, modifier: Modifier = Modifier, onClick: (
 }
 
 @Composable
+private fun MyListButton(vm: AppViewModel, item: VodItem) {
+    val inList = vm.inMyList(item)
+    ActionButton(if (inList) "✓  Listemde" else "＋  Listeme ekle") { vm.toggleMyList(item) }
+}
+
+@Composable
 private fun MovieActions(vm: AppViewModel, item: VodItem, firstReq: FocusRequester) {
     val key = "m${item.id}"
     val pos = vm.watch.position(key)
@@ -649,6 +679,7 @@ private fun MovieActions(vm: AppViewModel, item: VodItem, firstReq: FocusRequest
         } else {
             ActionButton("▶  Oynat", Modifier.focusRequester(firstReq)) { vm.playMovie(fromStart = true) }
         }
+        MyListButton(vm, item)
     }
     if (vm.watch.isDone(key)) {
         Text("✓ İzlendi", color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp, start = 4.dp))
@@ -670,12 +701,15 @@ private fun SeriesPart(
         return
     }
     val resume = vm.resumeEpisode()
-    if (resume != null) {
-        val started = vm.watch.lastEpisode(item.id) != null
-        ActionButton(
-            if (started) "▶  Devam et: S${resume.season} B${resume.num}" else "▶  İzlemeye başla",
-            Modifier.focusRequester(firstReq),
-        ) { vm.playEpisode(resume) }
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (resume != null) {
+            val started = vm.watch.lastEpisode(item.id) != null
+            ActionButton(
+                if (started) "▶  Devam et: S${resume.season} B${resume.num}" else "▶  İzlemeye başla",
+                Modifier.focusRequester(firstReq),
+            ) { vm.playEpisode(resume) }
+        }
+        MyListButton(vm, item)
     }
 
     // Sezonlar
