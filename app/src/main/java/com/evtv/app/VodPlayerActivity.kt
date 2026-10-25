@@ -680,6 +680,8 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
     var onMenu: (() -> Unit)? = null
     /** Sağ/sol: (ileri mi, tuş tekrar sayısı) */
     var onSeek: ((Boolean, Int) -> Unit)? = null
+    /** Orta tuşa basma bizim tarafımızdan başlatıldı mı (bırakma da bizde kalsın) */
+    private var centerDown = false
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val p = player ?: return super.dispatchKeyEvent(event)
@@ -701,18 +703,36 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
                     onSeek?.invoke(true, event.repeatCount) ?: p.seekForward()
                     return true
                 }
-                isCenter -> {
-                    if (event.repeatCount == 0) {
-                        if (p.isPlaying) p.pause() else p.play()
-                    }
-                    showController()
-                    return true
-                }
             }
         }
-        // Gizliyken orta tuşun bırakılması kontrol düğmesine basmasın
+        // Orta tuş = oynat/duraklat (kontroller kapalıyken ya da seçim oynat/duraklat düğmesindeyken).
+        // Kullanıcı başka bir düğmeye (CC, ⚙, sonraki) gittiyse o düğmeye basılır.
+        if (isCenter) {
+            val pp: View? = findViewById(androidx.media3.ui.R.id.exo_play_pause)
+            val focused = findFocus()
+            val ours = !isControllerFullyVisible || focused == null || focused === pp || centerDown
+            if (ours) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    if (event.repeatCount == 0) {
+                        centerDown = true
+                        if (p.playWhenReady) {
+                            p.pause()
+                            showController()
+                            pp?.requestFocus()
+                        } else {
+                            p.play()
+                            hideController()
+                        }
+                    }
+                } else if (event.action == KeyEvent.ACTION_UP) {
+                    centerDown = false
+                }
+                return true
+            }
+        }
+        // Gizliyken sağ/sol bırakılması kontrol düğmesine gitmesin
         if (event.action == KeyEvent.ACTION_UP && !isControllerFullyVisible &&
-            (isCenter || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)
+            (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)
         ) return true
         return super.dispatchKeyEvent(event)
     }
