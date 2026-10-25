@@ -104,9 +104,13 @@ fun GuideScreen(vm: AppViewModel, catState: LazyListState, tabReq: FocusRequeste
             return@LaunchedEffect
         }
         vm.pendingFocus = FocusTarget.None
-        val i = categories.indexOfFirst { it.id == vm.selectedCategoryId }.coerceAtLeast(0)
+        val rows = categoryRows(
+            vm, "live", categories.filter { it.id == CAT_ALL || it.id == CAT_FAV },
+            categories.filter { it.id != CAT_ALL && it.id != CAT_FAV }, vm.selectedCategoryId,
+        )
+        val i = rows.indexOfFirst { it.key == vm.selectedCategoryId }.coerceAtLeast(0)
         catState.scrollToItem((i - 3).coerceAtLeast(0))
-        focusWhenReady { catReq[categories[i].id] }
+        rows.getOrNull(i)?.let { r -> focusWhenReady { catReq[r.key] } }
     }
 
     if (categories.isEmpty()) {
@@ -119,29 +123,17 @@ fun GuideScreen(vm: AppViewModel, catState: LazyListState, tabReq: FocusRequeste
 
     Row(Modifier.fillMaxSize()) {
         // ---- Kategoriler ----
-        LazyColumn(state = catState, modifier = Modifier.width(230.dp).fillMaxHeight().enterAt { catReq[vm.selectedCategoryId] }) {
-            items(categories, key = { it.id }) { cat ->
-                val fr = remember { FocusRequester() }
-                DisposableEffect(cat.id) {
-                    catReq[cat.id] = fr
-                    onDispose { if (catReq[cat.id] === fr) catReq.remove(cat.id) }
-                }
-                val isSel = cat.id == vm.selectedCategoryId
-                FocusRow(
-                    modifier = Modifier.focusRequester(fr)
-                        .flushOnKey(catDeb, AndroidKey.KEYCODE_DPAD_RIGHT, scope, fm, FocusDirection.Right),
-                    selected = isSel,
-                    onFocused = { catDeb.submit(cat.id) },
-                    onClick = { catDeb.cancel(); vm.selectCategory(cat.id) },
-                ) { f ->
-                    Text(
-                        (if (cat.id == CAT_FAV) "★ " else "") + cat.name,
-                        color = if (f || isSel) C.text else C.sub, fontSize = 15.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
+        CategoryColumn(
+            vm = vm, type = "live",
+            specials = categories.filter { it.id == CAT_ALL || it.id == CAT_FAV },
+            cats = categories.filter { it.id != CAT_ALL && it.id != CAT_FAV },
+            selected = vm.selectedCategoryId, state = catState, catReq = catReq, deb = catDeb,
+            label = { (if (it.id == CAT_FAV) "★ " else "") + it.name },
+            count = { null },
+            onClickCat = { vm.selectCategory(it) },
+            modifier = Modifier.width(230.dp).fillMaxHeight(),
+            fontSize = 15,
+        )
         Spacer(Modifier.width(16.dp))
 
         Column(Modifier.weight(1f).fillMaxHeight()) {

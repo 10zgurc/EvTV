@@ -194,9 +194,10 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
         }
         if (vm.pendingFocus != FocusTarget.None) {
             vm.pendingFocus = FocusTarget.None
-            val i = cats.indexOfFirst { it.id == selected }.coerceAtLeast(0)
+            val rows = categoryRows(vm, if (series) "series" else "movie", cats.filter { it.id.startsWith("__") }, cats.filter { !it.id.startsWith("__") }, selected)
+            val i = rows.indexOfFirst { it.key == selected }.coerceAtLeast(0)
             catState.scrollToItem((i - 3).coerceAtLeast(0))
-            focusWhenReady { catReq[cats[i].id] }
+            rows.getOrNull(i)?.let { r -> focusWhenReady { catReq[r.key] } }
         }
     }
 
@@ -217,41 +218,29 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
     }
 
     Row(Modifier.fillMaxSize()) {
-        LazyColumn(state = catState, modifier = Modifier.width(300.dp).fillMaxHeight().enterAt { catReq[vm.selectedVodCat(series)] }) {
-            items(cats, key = { it.id }) { cat ->
-                val fr = remember { FocusRequester() }
-                DisposableEffect(cat.id) {
-                    catReq[cat.id] = fr
-                    onDispose { if (catReq[cat.id] === fr) catReq.remove(cat.id) }
+        CategoryColumn(
+            vm = vm, type = if (series) "series" else "movie",
+            specials = cats.filter { it.id.startsWith("__") }, cats = cats.filter { !it.id.startsWith("__") },
+            selected = selected, state = catState, catReq = catReq, deb = catDeb,
+            label = { cat ->
+                when (cat.id) {
+                    CAT_RECENT -> "▶ "
+                    CAT_MYLIST -> "★ "
+                    CAT_SEARCH -> "🔍 "
+                    else -> ""
+                } + cat.name
+            },
+            count = { cat ->
+                when (cat.id) {
+                    CAT_RECENT -> vm.watch.recents(series).size
+                    CAT_MYLIST -> vm.watch.myList(series).size
+                    CAT_SEARCH -> null
+                    else -> vm.vodItems[vm.vodKey(series, cat.id)]?.size
                 }
-                val isSel = cat.id == selected
-                FocusRow(
-                    modifier = Modifier.focusRequester(fr)
-                        .flushOnKey(catDeb, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, scope, fm, FocusDirection.Right),
-                    selected = isSel,
-                    onFocused = { catDeb.submit(cat.id) },
-                    onClick = { catDeb.cancel(); vm.selectVodCategory(series, cat.id) },
-                ) { f ->
-                    Text(
-                        when (cat.id) {
-                            CAT_RECENT -> "▶ "
-                            CAT_MYLIST -> "★ "
-                            CAT_SEARCH -> "🔍 "
-                            else -> ""
-                        } + cat.name,
-                        color = if (f || isSel) C.text else C.sub, fontSize = 17.sp,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
-                    )
-                    val n = when (cat.id) {
-                        CAT_RECENT -> vm.watch.recents(series).size
-                        CAT_MYLIST -> vm.watch.myList(series).size
-                        CAT_SEARCH -> null
-                        else -> vm.vodItems[vm.vodKey(series, cat.id)]?.size
-                    }
-                    if (n != null) Text("$n", color = if (f) C.text else C.sub, fontSize = 14.sp)
-                }
-            }
-        }
+            },
+            onClickCat = { vm.selectVodCategory(series, it) },
+            modifier = Modifier.width(300.dp).fillMaxHeight(),
+        )
         Spacer(Modifier.width(24.dp))
         Box(Modifier.weight(1f).fillMaxHeight()) {
             when {
@@ -486,6 +475,10 @@ fun SettingsPane(vm: AppViewModel) {
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
         )
 
+        FocusRow(onClick = { vm.toggleGroupCats() }) { f ->
+            Text("Kategorileri ülkelere göre grupla", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(if (vm.groupCats) "Açık" else "Kapalı", color = if (f) C.text else C.accent, fontSize = 17.sp)
+        }
         FocusRow(onClick = { vm.openCategoryEditor("live") }) {
             Text("Kategorileri düzenle (gizle / sırala)", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
             val n = listOf("live", "movie", "series").sumOf { vm.hiddenCats[it].orEmpty().size }

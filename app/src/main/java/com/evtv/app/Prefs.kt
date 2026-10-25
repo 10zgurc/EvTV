@@ -124,6 +124,11 @@ class Prefs(ctx: Context) {
     fun setCatOrder(type: String, v: List<String>) =
         p.edit().putString("order_$type", org.json.JSONArray(v).toString()).apply()
 
+    /** Kategorileri ülkelere göre grupla */
+    var groupCats: Boolean
+        get() = p.getBoolean("groupCats", true)
+        set(v) = p.edit().putBoolean("groupCats", v).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

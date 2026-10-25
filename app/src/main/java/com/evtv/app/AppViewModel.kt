@@ -1001,12 +1001,53 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return j
     }
 
+    /** Gruptaki tüm kategorileri gizle / göster */
+    fun setGroupHidden(type: String, ids: List<String>, hide: Boolean) {
+        val cur = hiddenCats[type].orEmpty()
+        val next = if (hide) cur + ids else cur - ids.toSet()
+        hiddenCats[type] = next
+        prefs.setHiddenCats(type, next)
+    }
+
+    /** Kategoriyi kendi grubu içinde komşusunun önüne/arkasına taşır */
+    fun moveWithinGroup(type: String, id: String, delta: Int, groupIds: List<String>) {
+        val gi = groupIds.indexOf(id)
+        val target = groupIds.getOrNull(gi + delta) ?: return
+        val list = editorCategories(type).map { it.id }.toMutableList()
+        list.remove(id)
+        val ti = list.indexOf(target)
+        if (ti < 0) return
+        list.add(if (delta > 0) ti + 1 else ti, id)
+        catOrders[type] = list
+        prefs.setCatOrder(type, list)
+    }
+
     fun resetOrder(type: String) {
         catOrders[type] = emptyList()
         prefs.setCatOrder(type, emptyList())
     }
 
     fun channelCountIn(catId: String) = channelsByCategory[catId]?.size ?: 0
+
+    // ---- Ülke grupları ----
+
+    var groupCats by mutableStateOf(prefs.groupCats)
+        private set
+
+    fun toggleGroupCats() {
+        groupCats = !groupCats
+        prefs.groupCats = groupCats
+    }
+
+    /** type → açık grup kodu (null = ülke listesi). Hiç seçilmediyse seçili kategorinin grubu. */
+    private val openGroups = mutableStateMapOf<String, String?>()
+
+    fun openGroupFor(type: String, default: () -> String?): String? =
+        if (openGroups.containsKey(type)) openGroups[type] else default()
+
+    fun setOpenGroup(type: String, code: String?) {
+        openGroups[type] = code
+    }
 
     fun logout() {
         loadJob?.cancel()

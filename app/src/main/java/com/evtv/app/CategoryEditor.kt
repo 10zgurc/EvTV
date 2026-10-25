@@ -94,21 +94,58 @@ fun CategoryEditor(vm: AppViewModel) {
             return@Column
         }
 
+        // Ülkelere ayrılabiliyorsa başlıklarla göster
+        val groups = groupCategories(cats)
+        val rows: List<Pair<CatGroup?, Category?>> =
+            groups?.flatMap { g -> listOf<Pair<CatGroup?, Category?>>(g to null) + g.cats.map { g to it } }
+                ?: cats.map { null to it }
+
         LazyColumn(state = state, modifier = Modifier.width(720.dp)) {
-            items(cats, key = { it.id }) { cat ->
+            items(rows, key = { (g, c) -> c?.id ?: ("g:" + g?.code) }) { (g, cat) ->
+                if (cat == null && g != null) {
+                    // ---- Ülke başlığı: tümünü gizle/göster ----
+                    val ids = g.cats.map { it.id }
+                    val hiddenN = ids.count { it in hidden }
+                    FocusRow(
+                        modifier = Modifier.padding(top = 10.dp),
+                        onClick = { vm.setGroupHidden(type, ids, hide = hiddenN < ids.size) },
+                    ) { f ->
+                        Text(
+                            when (hiddenN) {
+                                0 -> "☑"
+                                ids.size -> "☐"
+                                else -> "◪"
+                            },
+                            color = if (hiddenN == ids.size) C.sub else C.accent, fontSize = 22.sp, modifier = Modifier.width(34.dp),
+                        )
+                        Text("${g.flag}  ${g.name}", color = C.text, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f))
+                        Text(
+                            if (hiddenN == ids.size) "tümü gizli" else "${ids.size - hiddenN}/${ids.size} görünüyor",
+                            color = if (f) C.text else C.sub, fontSize = 14.sp,
+                        )
+                    }
+                    return@items
+                }
+                cat ?: return@items
                 val isHidden = cat.id in hidden
                 val isMoving = moving == cat.id
+                val groupIds = g?.cats?.map { it.id }
                 FocusRow(
-                    modifier = Modifier.onPreviewKeyEvent { e ->
+                    modifier = Modifier.padding(start = if (g != null) 24.dp else 0.dp).onPreviewKeyEvent { e ->
                         if (!isMoving || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         val delta = when (e.nativeKeyEvent.keyCode) {
                             AndroidKey.KEYCODE_DPAD_UP -> -1
                             AndroidKey.KEYCODE_DPAD_DOWN -> 1
                             else -> return@onPreviewKeyEvent false
                         }
-                        val ni = vm.moveCategory(type, cat.id, delta)
+                        if (groupIds != null) vm.moveWithinGroup(type, cat.id, delta, groupIds)
+                        else vm.moveCategory(type, cat.id, delta)
                         // Taşınan satır ekranda kalsın
                         scope.launch {
+                            val ni = groupCategories(vm.editorCategories(type))
+                                ?.flatMap { gg -> listOf<String?>(null) + gg.cats.map { it.id } }
+                                ?.indexOf(cat.id) ?: vm.editorCategories(type).indexOfFirst { it.id == cat.id }
                             val vis = state.layoutInfo.visibleItemsInfo
                             if (vis.isNotEmpty() && (ni <= vis.first().index || ni >= vis.last().index)) {
                                 state.scrollToItem((ni - 4).coerceAtLeast(0))
@@ -123,7 +160,8 @@ fun CategoryEditor(vm: AppViewModel) {
                     Text(if (isHidden) "☐" else "☑", color = if (isHidden) C.sub else C.accent, fontSize = 22.sp,
                         modifier = Modifier.width(34.dp))
                     Text(
-                        cat.name, color = if (isHidden && !f) C.sub else C.text, fontSize = 17.sp, maxLines = 1,
+                        if (g != null) stripPrefix(cat.name) else cat.name,
+                        color = if (isHidden && !f) C.sub else C.text, fontSize = 17.sp, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
                     if (type == "live") Text("${vm.channelCountIn(cat.id)}", color = C.sub, fontSize = 14.sp)
