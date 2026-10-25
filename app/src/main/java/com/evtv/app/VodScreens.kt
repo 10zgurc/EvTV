@@ -48,7 +48,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -204,7 +203,7 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
     }
 
     Row(Modifier.fillMaxSize()) {
-        LazyColumn(state = catState, modifier = Modifier.width(300.dp).fillMaxHeight().focusRestorer()) {
+        LazyColumn(state = catState, modifier = Modifier.width(300.dp).fillMaxHeight().enterAt { catReq[vm.selectedVodCat(series)] }) {
             items(cats, key = { it.id }) { cat ->
                 val fr = remember { FocusRequester() }
                 DisposableEffect(cat.id) {
@@ -282,7 +281,7 @@ fun PosterGrid(
         contentPadding = PaddingValues(6.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize().focusRestorer(),
+        modifier = Modifier.fillMaxSize(),
     ) {
         items(list, key = { it.id }) { item ->
             val fr = remember { FocusRequester() }
@@ -683,7 +682,7 @@ private fun SeriesPart(
     if (ser.seasons.size > 1) {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 14.dp).focusRestorer(),
+            modifier = Modifier.padding(top = 14.dp),
         ) {
             items(ser.seasons.keys.toList(), key = { it }) { s ->
                 Box {
@@ -703,7 +702,7 @@ private fun SeriesPart(
     // Bölümler
     val eps = ser.seasons[vm.selectedSeason].orEmpty()
     LaunchedEffect(vm.selectedSeason) { epState.scrollToItem(0) }
-    LazyColumn(state = epState, modifier = Modifier.padding(top = 10.dp).fillMaxWidth().focusRestorer()) {
+    LazyColumn(state = epState, modifier = Modifier.padding(top = 10.dp).fillMaxWidth()) {
         items(eps, key = { it.id }) { ep ->
             val fr = remember { FocusRequester() }
             DisposableEffect(ep.id) {

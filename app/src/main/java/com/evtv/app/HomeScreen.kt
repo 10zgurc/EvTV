@@ -35,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,7 +106,7 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
     Row(Modifier.fillMaxSize()) {
         // ---- Sol: kategoriler ----
         Column(Modifier.width(300.dp).fillMaxHeight()) {
-            LazyColumn(state = catState, modifier = Modifier.weight(1f).focusRestorer()) {
+            LazyColumn(state = catState, modifier = Modifier.weight(1f).enterAt { catReq[vm.selectedCategoryId] }) {
                 items(categories, key = { it.id }) { cat ->
                     val fr = remember { FocusRequester() }
                     DisposableEffect(cat.id) {
@@ -169,7 +168,7 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
                         color = C.sub, fontSize = 17.sp,
                     )
                 }
-                else -> LazyColumn(state = chState, modifier = Modifier.fillMaxSize().focusRestorer()) {
+                else -> LazyColumn(state = chState, modifier = Modifier.fillMaxSize()) {
                     items(channels, key = { it.streamId }) { ch ->
                         val fr = remember { FocusRequester() }
                         DisposableEffect(ch.streamId) {

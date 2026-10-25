@@ -3,6 +3,7 @@ package com.evtv.app
 import android.view.KeyEvent as AndroidKey
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
@@ -189,3 +191,13 @@ fun Modifier.flushOnKey(
         true
     } else false
 }
+
+/**
+ * Bu listeye yandan girilince odak, seçili satıra gelsin (en yakın satıra değil).
+ * Satır ekranda değilse normal davranış.
+ */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun Modifier.enterAt(target: () -> androidx.compose.ui.focus.FocusRequester?): Modifier =
+    this.focusProperties {
+        enter = { target() ?: androidx.compose.ui.focus.FocusRequester.Default }
+    }.focusGroup()

@@ -12,3 +12,6 @@
 -keep class androidx.media3.exoplayer.DefaultRenderersFactory { *; }
 -dontwarn org.jellyfin.**
 -dontwarn androidx.media3.**
+
+# Hata raporları okunabilir kalsın (sınıf/metot adları değişmesin)
+-dontobfuscate
