@@ -81,7 +81,7 @@ fun LoginScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun TvField(
+fun TvField(
     label: String,
     value: String,
     onChange: (String) -> Unit,
@@ -89,6 +89,7 @@ private fun TvField(
     type: KeyboardType = KeyboardType.Text,
     password: Boolean = false,
     last: Boolean = false,
+    imeSearch: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     OutlinedTextField(
@@ -97,10 +98,18 @@ private fun TvField(
         label = { Text(label) },
         singleLine = true,
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = type, imeAction = if (last) ImeAction.Done else ImeAction.Next),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = type,
+            imeAction = when {
+                imeSearch -> ImeAction.Search
+                last -> ImeAction.Done
+                else -> ImeAction.Next
+            },
+        ),
         keyboardActions = KeyboardActions(
             onNext = { fm.moveFocus(FocusDirection.Down) },
             onDone = { fm.moveFocus(FocusDirection.Down) },
+            onSearch = { fm.moveFocus(FocusDirection.Down) },
         ),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = C.focus,
@@ -116,6 +125,7 @@ private fun TvField(
             when (e.nativeKeyEvent.keyCode) {
                 AndroidKey.KEYCODE_DPAD_DOWN -> fm.moveFocus(FocusDirection.Down)
                 AndroidKey.KEYCODE_DPAD_UP -> fm.moveFocus(FocusDirection.Up)
+                AndroidKey.KEYCODE_DPAD_LEFT -> if (value.isEmpty()) fm.moveFocus(FocusDirection.Left) else false
                 else -> false
             }
         },

@@ -209,12 +209,19 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                     onClick = { vm.selectVodCategory(series, cat.id) },
                 ) { f ->
                     Text(
-                        (if (cat.id == CAT_RECENT) "▶ " else "") + cat.name,
+                        when (cat.id) {
+                            CAT_RECENT -> "▶ "
+                            CAT_SEARCH -> "🔍 "
+                            else -> ""
+                        } + cat.name,
                         color = if (f || isSel) C.text else C.sub, fontSize = 17.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
-                    val n = if (cat.id == CAT_RECENT) vm.watch.recents(series).size
-                    else vm.vodItems[vm.vodKey(series, cat.id)]?.size
+                    val n = when (cat.id) {
+                        CAT_RECENT -> vm.watch.recents(series).size
+                        CAT_SEARCH -> null
+                        else -> vm.vodItems[vm.vodKey(series, cat.id)]?.size
+                    }
                     if (n != null) Text("$n", color = if (f) C.text else C.sub, fontSize = 14.sp)
                 }
             }
@@ -222,6 +229,7 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
         Spacer(Modifier.width(24.dp))
         Box(Modifier.weight(1f).fillMaxHeight()) {
             when {
+                selected == CAT_SEARCH -> SearchPane(vm, series, list.orEmpty(), grid, itemReq)
                 list == null && vm.vodErrors[key] != null -> CenterBox {
                     Text(vm.vodErrors[key] ?: "", color = C.error, fontSize = 17.sp)
                     Spacer(Modifier.height(16.dp))
@@ -241,30 +249,43 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                         color = C.sub, fontSize = 17.sp,
                     )
                 }
-                else -> LazyVerticalGrid(
-                    columns = GridCells.Fixed(6),
-                    state = grid,
-                    contentPadding = PaddingValues(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize().focusRestorer(),
-                ) {
-                    items(list.orEmpty(), key = { it.id }) { item ->
-                        val fr = remember { FocusRequester() }
-                        DisposableEffect(item.id) {
-                            itemReq[item.id] = fr
-                            onDispose { if (itemReq[item.id] === fr) itemReq.remove(item.id) }
-                        }
-                        PosterCard(
-                            item = item,
-                            progress = if (series) 0f else vm.watch.progress("m${item.id}"),
-                            modifier = Modifier.focusRequester(fr),
-                            onClick = { vm.openDetail(item) },
-                            onLongClick = if (selected == CAT_RECENT) ({ vm.removeFromRecents(item) }) else null,
-                        )
-                    }
-                }
+                else -> PosterGrid(vm, series, list.orEmpty(), grid, itemReq, selected == CAT_RECENT)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun PosterGrid(
+    vm: AppViewModel,
+    series: Boolean,
+    list: List<VodItem>,
+    grid: LazyGridState,
+    itemReq: HashMap<Int, FocusRequester>,
+    removable: Boolean,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(6),
+        state = grid,
+        contentPadding = PaddingValues(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().focusRestorer(),
+    ) {
+        items(list, key = { it.id }) { item ->
+            val fr = remember { FocusRequester() }
+            DisposableEffect(item.id) {
+                itemReq[item.id] = fr
+                onDispose { if (itemReq[item.id] === fr) itemReq.remove(item.id) }
+            }
+            PosterCard(
+                item = item,
+                progress = if (series) 0f else vm.watch.progress("m${item.id}"),
+                modifier = Modifier.focusRequester(fr),
+                onClick = { vm.openDetail(item) },
+                onLongClick = if (removable) ({ vm.removeFromRecents(item) }) else null,
+            )
         }
     }
 }
@@ -325,6 +346,52 @@ fun PosterCard(
             item.name, color = if (focused) C.text else C.sub, fontSize = 14.sp, maxLines = 2,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
         )
+    }
+}
+
+// =====================================================================
+// Arama
+// =====================================================================
+
+@Composable
+fun SearchPane(
+    vm: AppViewModel,
+    series: Boolean,
+    results: List<VodItem>,
+    grid: LazyGridState,
+    itemReq: HashMap<Int, FocusRequester>,
+) {
+    val query = vm.searchQuery[series].orEmpty()
+    val status = vm.indexStatus[series]
+    val what = if (series) "dizi" else "film"
+    Column(Modifier.fillMaxSize()) {
+        TvField(
+            label = "${what.replaceFirstChar { it.uppercase() }} adı yaz (Türkçe karakter şart değil)",
+            value = query,
+            onChange = { vm.setSearchQuery(series, it) },
+            fm = androidx.compose.ui.platform.LocalFocusManager.current,
+            imeSearch = true,
+            modifier = Modifier.width(620.dp),
+        )
+        val info = when {
+            status?.building == true && !vm.indexReady(series) ->
+                "Arama için $what listesi ilk kez indiriliyor… ${if (status.progress > 0) "${status.progress} $what" else ""}\nBu sadece bir kez, 1-2 dakika sürer."
+            status?.building == true -> "Liste arka planda güncelleniyor; arama çalışıyor."
+            status?.error != null -> status.error
+            query.isBlank() -> "${vm.indexSize(series)} $what içinde ara."
+            vm.searching -> "Aranıyor…"
+            results.isEmpty() -> "Sonuç bulunamadı."
+            results.size >= 180 -> "İlk 180 sonuç gösteriliyor; aramayı daraltabilirsin."
+            else -> "${results.size} sonuç"
+        }
+        Text(info, color = if (status?.error != null) C.error else C.sub, fontSize = 15.sp,
+            modifier = Modifier.padding(top = 8.dp, bottom = 10.dp, start = 4.dp))
+        if (status?.error != null) {
+            Box(Modifier.width(260.dp)) {
+                FocusRow(onClick = { vm.prepareSearch(series, force = true) }) { Text("Tekrar dene", color = C.text) }
+            }
+        }
+        if (results.isNotEmpty()) PosterGrid(vm, series, results, grid, itemReq, removable = false)
     }
 }
 

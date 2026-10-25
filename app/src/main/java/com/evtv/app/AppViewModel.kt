@@ -25,6 +25,7 @@ enum class Section { Live, Movies, Series, Settings }
 const val CAT_ALL = "__all"
 const val CAT_FAV = "__fav"
 const val CAT_RECENT = "__recent"
+const val CAT_SEARCH = "__search"
 
 private const val EPG_MAX_AGE = 15 * 60_000L
 
@@ -33,6 +34,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
     private val cache = ChannelCache(app)
     val watch = WatchStore(app)
+    private val movieIndex = SearchIndex(app, "m")
+    private val seriesIndex = SearchIndex(app, "s")
     private var api: XtreamApi? = null
     private var loadJob: Job? = null
 
@@ -138,6 +141,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         // Başka hesaba geçildi: eski önbellek ve kategori seçimi geçersiz
                         cache.clear()
                         watch.clear()
+                        movieIndex.clear()
+                        seriesIndex.clear()
                         selectedCategoryId = CAT_ALL
                         prefs.lastCategory = CAT_ALL
                         prefs.lastMovieCat = ""
@@ -357,7 +362,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun vodCategoriesFor(series: Boolean): List<Category> {
         val cats = if (series) seriesCats else movieCats
         if (cats.isEmpty()) return emptyList()
-        return listOf(Category(CAT_RECENT, "İzlemeye devam et")) + cats
+        return listOf(Category(CAT_SEARCH, "Ara"), Category(CAT_RECENT, "İzlemeye devam et")) + cats
     }
 
     fun selectedVodCat(series: Boolean) = if (series) selectedSeriesCat else selectedMovieCat
@@ -372,7 +377,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             selectedMovieCat = id
             prefs.lastMovieCat = id
         }
-        if (id != CAT_RECENT) loadVodItems(series, id)
+        when (id) {
+            CAT_RECENT -> {}
+            CAT_SEARCH -> prepareSearch(series)
+            else -> loadVodItems(series, id)
+        }
     }
 
     fun ensureVodCategories(force: Boolean = false) {
@@ -397,7 +406,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 // Kayıtlı kategori artık yoksa "İzlemeye devam et" ya da ilk kategori
                 fun pick(cur: String, cats: List<Category>, series: Boolean): String = when {
-                    cur == CAT_RECENT -> cur
+                    cur == CAT_RECENT && watch.recents(series).isNotEmpty() -> cur
                     cats.any { it.id == cur } -> cur
                     watch.recents(series).isNotEmpty() -> CAT_RECENT
                     else -> cats.firstOrNull()?.id ?: ""
@@ -420,6 +429,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             watchVersion // değişiklikleri izle
             return watch.recents(series)
         }
+        if (cat == CAT_SEARCH) return searchResults[series] ?: emptyList()
         return vodItems[vodKey(series, cat)]
     }
 
@@ -614,6 +624,67 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.subtitleSize = subtitleSize
     }
 
+    // ---- Arama ----
+
+    data class IndexStatus(val building: Boolean, val progress: Int = 0, val error: String? = null)
+
+    /** Anahtar: true = diziler, false = filmler */
+    val searchQuery = mutableStateMapOf<Boolean, String>()
+    val searchResults = mutableStateMapOf<Boolean, List<VodItem>>()
+    val indexStatus = mutableStateMapOf<Boolean, IndexStatus>()
+    var searching by mutableStateOf(false)
+        private set
+    private val searchJobs = HashMap<Boolean, Job>()
+
+    private fun index(series: Boolean) = if (series) seriesIndex else movieIndex
+
+    fun indexSize(series: Boolean) = index(series).size
+    fun indexReady(series: Boolean) = index(series).exists
+
+    /** Arama dizini yoksa ya da 3 günden eskiyse arka planda (yeniden) oluştur. */
+    fun prepareSearch(series: Boolean, force: Boolean = false) {
+        val idx = index(series)
+        if (indexStatus[series]?.building == true) return
+        if (!force && idx.exists && idx.ageMs < 3L * 24 * 3600_000) return
+        val a = api ?: return
+        viewModelScope.launch {
+            indexStatus[series] = IndexStatus(building = true)
+            try {
+                idx.build(a) { n -> viewModelScope.launch { indexStatus[series] = IndexStatus(true, n) } }
+                indexStatus.remove(series)
+                // Dizin hazırlanırken bir şey yazıldıysa şimdi ara
+                searchQuery[series]?.takeIf { it.isNotBlank() }?.let { setSearchQuery(series, it) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                indexStatus[series] = IndexStatus(false, 0, "Arama listesi indirilemedi: ${friendly(e)}")
+            }
+        }
+    }
+
+    fun setSearchQuery(series: Boolean, q: String) {
+        searchQuery[series] = q
+        searchJobs[series]?.cancel()
+        if (q.isBlank()) {
+            searchResults[series] = emptyList()
+            return
+        }
+        if (!index(series).exists) return
+        searchJobs[series] = viewModelScope.launch {
+            delay(350)
+            searching = true
+            try {
+                searchResults[series] = index(series).search(q)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                searchResults[series] = emptyList()
+            } finally {
+                searching = false
+            }
+        }
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()
@@ -629,6 +700,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         vodItems.clear()
         vodErrors.clear()
         watch.clear()
+        movieIndex.clear()
+        seriesIndex.clear()
+        searchResults.clear()
         error = null
         loading = false
         refreshing = false

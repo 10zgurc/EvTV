@@ -94,29 +94,31 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
     }
 
     /** Büyük yanıtları belleğe tamamen almadan, parça parça okur. */
-    internal suspend fun <T> streamArray(query: String, parse: (Map<String, String?>, Int) -> T?): List<T> =
+    internal suspend fun <T> streamArray(query: String, parse: (Map<String, String?>, Int) -> T?): List<T> {
+        val out = ArrayList<T>()
+        streamEach(query) { m, i -> parse(m, i)?.let(out::add) }
+        return out
+    }
+
+    /** Her öğe için onItem çağrılır; hiçbir şey biriktirilmez (200 bin+ öğe için). */
+    internal suspend fun streamEach(query: String, onItem: (Map<String, String?>, Int) -> Unit) =
         withContext(Dispatchers.IO) {
             val c = open(query)
             try {
-                JsonReader(InputStreamReader(c.inputStream.buffered(), Charsets.UTF_8)).use { r ->
+                JsonReader(InputStreamReader(c.inputStream.buffered(64 * 1024), Charsets.UTF_8)).use { r ->
                     r.isLenient = true
-                    val out = ArrayList<T>()
-                    when (r.peek()) {
-                        JsonToken.BEGIN_ARRAY -> {
-                            r.beginArray()
-                            var i = 0
-                            while (r.hasNext()) {
-                                if (r.peek() == JsonToken.BEGIN_OBJECT) {
-                                    parse(readFlatObject(r), i)?.let(out::add)
-                                } else r.skipValue()
-                                i++
-                            }
-                            r.endArray()
+                    if (r.peek() == JsonToken.BEGIN_ARRAY) {
+                        r.beginArray()
+                        var i = 0
+                        while (r.hasNext()) {
+                            if (r.peek() == JsonToken.BEGIN_OBJECT) onItem(readFlatObject(r), i) else r.skipValue()
+                            i++
                         }
+                        r.endArray()
+                    } else {
                         // Bazı sunucular boş listeyi {} ya da null olarak döner
-                        else -> r.skipValue()
+                        r.skipValue()
                     }
-                    out
                 }
             } finally {
                 c.disconnect()

@@ -65,9 +65,9 @@ private fun JSONObject.str(vararg keys: String): String? {
     return null
 }
 
-private fun String?.httpOrNull(): String? = this?.trim()?.takeIf { it.startsWith("http", true) }
+internal fun String?.httpOrNull(): String? = this?.trim()?.takeIf { it.startsWith("http", true) }
 
-private fun ratingText(r: String?): String? {
+internal fun ratingText(r: String?): String? {
     val d = r?.replace(',', '.')?.toDoubleOrNull() ?: return null
     if (d <= 0) return null
     return String.format(java.util.Locale.US, "%.1f", if (d > 10) d / 10 else d)
