@@ -93,6 +93,13 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
         if (vm.section == Section.Movies || vm.section == Section.Series) vm.ensureVodCategories()
     }
 
+    // Geri: önce Ana Sayfa'ya dön, Ana Sayfa'dayken uygulamadan çık
+    androidx.activity.compose.BackHandler(enabled = vm.section != Section.Home) {
+        tabDeb.cancel()
+        vm.pendingFocus = FocusTarget.LastChannel
+        vm.selectSection(Section.Home)
+    }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             androidx.compose.foundation.Image(
@@ -459,9 +466,16 @@ private fun LanguagePicker(title: String, value: String, allowOff: Boolean, onPi
 
 @Composable
 fun SettingsPane(vm: AppViewModel) {
+    val firstReq = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (vm.pendingFocus != FocusTarget.None) {
+            vm.pendingFocus = FocusTarget.None
+            focusWhenReady { firstReq }
+        }
+    }
     Column(Modifier.width(640.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         Text("Oynatma", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
-        FocusRow(onClick = { vm.cycleBufferLevel() }) { f ->
+        FocusRow(modifier = Modifier.focusRequester(firstReq), onClick = { vm.cycleBufferLevel() }) { f ->
             Text("Donma önleme (tampon)", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
             Text(bufferLevelName(vm.bufferLevel), color = if (f) C.text else C.accent, fontSize = 17.sp)
         }

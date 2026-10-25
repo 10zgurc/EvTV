@@ -154,6 +154,8 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
                                 onFocus = { hero = Hero.Tile(t.title, t.text) },
                             ) {
                                 vm.homeLastKey = t.key
+                                // Açılan bölümde odak hazır olsun
+                                vm.pendingFocus = FocusTarget.Category
                                 when (t.key) {
                                     "t_live" -> vm.selectSection(Section.Live)
                                     "t_movies" -> vm.selectSection(Section.Movies)
