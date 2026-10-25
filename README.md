@@ -23,9 +23,29 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 | Menü | Favoriye ekle/çıkar |
 | Geri | Listeye dön |
 
+## Filmler ve diziler
+- Kategoriler, afiş ızgarası, puan; kategori açıldıkça yüklenir (200 bin film bir anda inmez)
+- Film/dizi detayı: konu, yıl, süre, tür, oyuncular
+- Diziler: sezonlar, bölümler, izlenen bölümde ✓, yarım kalanlarda ilerleme çubuğu
+- Kaldığın yerden devam, "İzlemeye devam et" listesi (uzun basınca listeden çıkar)
+- Bölüm bitince sıradaki otomatik başlar
+
+### Film oynatıcıda tuşlar
+| Tuş | İşlev |
+|---|---|
+| Sol / Sağ | 10 sn geri / 30 sn ileri |
+| Orta tuş | Duraklat / oynat ve kontrolleri aç |
+| Kontroller açıkken | CC = altyazı, ⚙ = ses dili ve hız, ⏭ = sonraki bölüm |
+| Geri | Kontrolleri kapat, tekrar basınca çık |
+
+### Altyazı
+- Ayarlar sekmesinden otomatik altyazı dili (Türkçe / İngilizce / Kapalı) ve boyutu seçilir
+- Videonun içindeki SRT, ASS, PGS (Blu-ray) ve DVB altyazıları desteklenir
+- Dolby (AC3/E-AC3), DTS ve TrueHD sesler TV desteklemese bile yazılımla çözülür
+
 ## Bilinen sınırlar
-- Bazı TV'ler AC3/E-AC3 (Dolby) sesi çözemez; o kanallarda ses gelmeyebilir. Bu, TiviMate'te de cihaza bağlıdır.
-- Tam EPG ızgarası, kayıt, catch-up, VOD ve arama henüz yok.
+- Videoda gömülü olmayan (internetten indirilen) altyazılar henüz yok.
+- Tam EPG ızgarası, kayıt, catch-up ve arama henüz yok.
 
 ## APK nasıl elde edilir (bilgisayar gerekmez)
 1. github.com'da ücretsiz hesap aç, **New repository** ile `EvTV` adında depo oluştur.
