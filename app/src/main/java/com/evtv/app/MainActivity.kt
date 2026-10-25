@@ -15,6 +15,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
@@ -61,6 +67,42 @@ fun EvTvApp(vm: AppViewModel = viewModel()) {
                 Screen.Player -> PlayerScreen(vm)
                 Screen.Detail -> DetailScreen(vm)
             }
+            vm.reportText?.let { ReportOverlay(it) { vm.closeReport() } }
         }
     }
 }
+
+/** Son çökme/donma raporu: fotoğrafını çekip gönder. */
+@Composable
+fun ReportOverlay(text: String, onClose: () -> Unit) {
+    val req = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.activity.compose.BackHandler { onClose() }
+    LaunchedEffect(Unit) { focusWhenReady { req } }
+    androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().androidx_background(),
+    ) {
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxSize().padding(36.dp),
+        ) {
+            androidx.compose.material3.Text(
+                "Hata raporu — bu ekranın fotoğrafını çekip gönder",
+                color = C.accent, fontSize = 22.sp,
+            )
+            androidx.compose.material3.Text(
+                text,
+                color = C.text, fontSize = 13.sp, lineHeight = 16.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            )
+            androidx.compose.foundation.layout.Box(Modifier.width(260.dp)) {
+                FocusRow(modifier = Modifier.focusRequester(req), onClick = onClose) {
+                    androidx.compose.material3.Text("Kapat", color = C.text, fontSize = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+private fun Modifier.androidx_background() = this.then(
+    Modifier.background(androidx.compose.ui.graphics.Color(0xF2080A0E))
+)

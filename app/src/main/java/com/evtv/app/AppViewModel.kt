@@ -740,6 +740,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         prefs.bufferLevel = bufferLevel
     }
 
+    // ---- Hata raporları ----
+
+    /** Ekranda gösterilecek çökme/donma raporu (null = gösterme) */
+    var reportText by mutableStateOf(EvTvApplication.takeUnseenReport(app)?.let { EvTvApplication.shorten(it) })
+        private set
+
+    fun showReports() {
+        reportText = EvTvApplication.allReports(getApplication<Application>())?.let { EvTvApplication.shorten(it) }
+            ?: "Kayıtlı hata raporu yok. 👍"
+    }
+
+    fun closeReport() {
+        reportText = null
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()

@@ -12,8 +12,8 @@ android {
         applicationId = "com.evtv.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.6"
+        versionCode = 7
+        versionName = "0.7"
     }
 
     // Sabit imza: her yeni sürüm eskisinin üzerine kurulur, favoriler silinmez
@@ -31,7 +31,9 @@ android {
             signingConfig = signingConfigs.getByName("evtv")
         }
         release {
-            isMinifyEnabled = false
+            // Kodu küçültüp optimize et: menüler daha akıcı, APK daha küçük
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("evtv")
         }
     }
@@ -76,4 +78,7 @@ dependencies {
 
     // Kanal logoları
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Yan yüklenen (Play Store dışı) kurulumda da hızlı açılış profili
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 }

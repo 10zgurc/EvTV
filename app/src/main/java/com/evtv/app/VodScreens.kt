@@ -45,6 +45,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -85,6 +86,9 @@ class HomeStates(
 fun HomeScreen(vm: AppViewModel, st: HomeStates) {
     val tabReqs = remember { Section.entries.associateWith { FocusRequester() } }
     val tabReq = tabReqs.getValue(vm.section)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val tabDeb = rememberDebouncer<Section>(350) { vm.selectSection(it) }
 
     LaunchedEffect(vm.section) {
         if (vm.section == Section.Movies || vm.section == Section.Series) vm.ensureVodCategories()
@@ -103,11 +107,12 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
                 }
                 Box {
                     FocusRow(
-                        modifier = Modifier.focusRequester(tabReqs.getValue(s)),
+                        modifier = Modifier.focusRequester(tabReqs.getValue(s))
+                            .flushOnKey(tabDeb, android.view.KeyEvent.KEYCODE_DPAD_DOWN, scope, fm, FocusDirection.Down),
                         fill = false,
                         selected = vm.section == s,
-                        onFocused = { vm.selectSection(s) },
-                        onClick = { vm.selectSection(s) },
+                        onFocused = { tabDeb.submit(s) },
+                        onClick = { tabDeb.cancel(); vm.selectSection(s) },
                     ) { f ->
                         Text(label, color = if (f || vm.section == s) C.text else C.sub, fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold)
@@ -145,6 +150,9 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
     val key = vm.vodKey(series, selected)
     val catReq = remember { HashMap<String, FocusRequester>() }
     val itemReq = remember { HashMap<Int, FocusRequester>() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val catDeb = rememberDebouncer<String> { vm.selectVodCategory(series, it) }
     vm.watchVersion // ilerleme çubukları güncellensin
 
     // Kategori değişince ızgarayı başa sar
@@ -205,10 +213,11 @@ fun VodHome(vm: AppViewModel, series: Boolean, catState: LazyListState, grid: La
                 }
                 val isSel = cat.id == selected
                 FocusRow(
-                    modifier = Modifier.focusRequester(fr),
+                    modifier = Modifier.focusRequester(fr)
+                        .flushOnKey(catDeb, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, scope, fm, FocusDirection.Right),
                     selected = isSel,
-                    onFocused = { vm.selectVodCategory(series, cat.id) },
-                    onClick = { vm.selectVodCategory(series, cat.id) },
+                    onFocused = { catDeb.submit(cat.id) },
+                    onClick = { catDeb.cancel(); vm.selectVodCategory(series, cat.id) },
                 ) { f ->
                     Text(
                         when (cat.id) {
@@ -503,6 +512,9 @@ fun SettingsPane(vm: AppViewModel) {
             vm.vodItems.clear()
         }) {
             Text(if (vm.refreshing) "Yenileniyor…" else "Tüm listeleri yenile", color = C.text, fontSize = 17.sp)
+        }
+        FocusRow(onClick = { vm.showReports() }) {
+            Text("Hata raporlarını göster", color = C.text, fontSize = 17.sp)
         }
         LogoutRow(vm)
         Spacer(Modifier.height(20.dp))

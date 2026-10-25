@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -67,6 +68,9 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
     val catReq = remember { HashMap<String, FocusRequester>() }
     val chReq = remember { HashMap<Int, FocusRequester>() }
     val fallbackReq = remember { FocusRequester() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val fm = androidx.compose.ui.platform.LocalFocusManager.current
+    val catDeb = rememberDebouncer<String> { vm.selectCategory(it) }
 
     // Kategori değişince kanal listesini başa sar (ekrana ilk girişte değil)
     var shownCategory by remember { mutableStateOf(vm.selectedCategoryId) }
@@ -112,10 +116,11 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
                     }
                     val isSel = cat.id == vm.selectedCategoryId
                     FocusRow(
-                        modifier = Modifier.focusRequester(fr),
+                        modifier = Modifier.focusRequester(fr)
+                            .flushOnKey(catDeb, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, scope, fm, FocusDirection.Right),
                         selected = isSel,
-                        onFocused = { vm.selectCategory(cat.id) },
-                        onClick = { vm.selectCategory(cat.id) },
+                        onFocused = { catDeb.submit(cat.id) },
+                        onClick = { catDeb.cancel(); vm.selectCategory(cat.id) },
                     ) { f ->
                         Text(
                             (if (cat.id == CAT_FAV) "★ " else "") + cat.name,

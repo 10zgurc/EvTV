@@ -25,6 +25,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import kotlinx.coroutines.launch
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -122,4 +124,68 @@ fun FocusRow(
     ) {
         content(focused)
     }
+}
+
+/**
+ * Listede gezinirken her adımda ağır içerik yenilenmesin diye seçim kısa bir gecikmeyle yapılır.
+ * Kullanıcı yan panele geçmek için tuşa basarsa bekleyen seçim hemen uygulanır.
+ */
+class Debouncer<T>(
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val delayMs: Long,
+    private val action: (T) -> Unit,
+) {
+    private var job: kotlinx.coroutines.Job? = null
+    private var pending: T? = null
+
+    fun submit(value: T) {
+        job?.cancel()
+        pending = value
+        job = scope.launch {
+            kotlinx.coroutines.delay(delayMs)
+            pending = null
+            action(value)
+        }
+    }
+
+    /** Bekleyen seçim varsa hemen uygula; uygulandıysa true. */
+    fun flush(): Boolean {
+        val p = pending ?: return false
+        job?.cancel()
+        pending = null
+        action(p)
+        return true
+    }
+
+    fun cancel() {
+        job?.cancel()
+        pending = null
+    }
+}
+
+@Composable
+fun <T> rememberDebouncer(delayMs: Long = 280, action: (T) -> Unit): Debouncer<T> {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val act by rememberUpdatedState(action)
+    return remember { Debouncer<T>(scope, delayMs) { act(it) } }
+}
+
+/**
+ * Belirtilen yön tuşuna basılınca bekleyen seçimi uygular, içerik yenilendikten sonra odağı o yöne taşır.
+ */
+fun Modifier.flushOnKey(
+    debouncer: Debouncer<*>,
+    keyCode: Int,
+    scope: kotlinx.coroutines.CoroutineScope,
+    focusManager: androidx.compose.ui.focus.FocusManager,
+    direction: androidx.compose.ui.focus.FocusDirection,
+): Modifier = this.onPreviewKeyEvent { e ->
+    if (e.type == KeyEventType.KeyDown && e.nativeKeyEvent.keyCode == keyCode && debouncer.flush()) {
+        scope.launch {
+            androidx.compose.runtime.withFrameNanos { }
+            androidx.compose.runtime.withFrameNanos { }
+            focusManager.moveFocus(direction)
+        }
+        true
+    } else false
 }
