@@ -43,9 +43,18 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 - Videonun içindeki SRT, ASS, PGS (Blu-ray) ve DVB altyazıları desteklenir
 - Dolby (AC3/E-AC3), DTS ve TrueHD sesler TV desteklemese bile yazılımla çözülür
 
+### Arama
+- Filmler ve Diziler'de en üstteki **🔍 Ara** kategorisi. Türkçe karakter yazmak şart değil ("sahsiyet" = "Şahsiyet").
+- İlk aramada tüm liste bir kez indirilir (1-2 dk), sonra anında arar; 3 günde bir arka planda tazelenir.
+
+### İnternetten altyazı (OpenSubtitles.com)
+- Ayarlar'a ücretsiz OpenSubtitles hesabı + API anahtarı girilir.
+- Videoda Türkçe altyazı yoksa otomatik bulunur ve eklenir.
+- İzlerken Menü tuşu veya üstteki "İnternetten altyazı" düğmesiyle listeden elle seçilebilir.
+- Ücretsiz hesapta günlük indirme sınırı vardır (bir kez indirilen altyazı TV'de saklanır).
+
 ## Bilinen sınırlar
-- Videoda gömülü olmayan (internetten indirilen) altyazılar henüz yok.
-- Tam EPG ızgarası, kayıt, catch-up ve arama henüz yok.
+- Tam EPG ızgarası, kayıt ve catch-up henüz yok.
 
 ## APK nasıl elde edilir (bilgisayar gerekmez)
 1. github.com'da ücretsiz hesap aç, **New repository** ile `EvTV` adında depo oluştur.
