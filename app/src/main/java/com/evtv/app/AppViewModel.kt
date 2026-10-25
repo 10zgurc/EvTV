@@ -612,13 +612,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var subtitleSize by mutableIntStateOf(prefs.subtitleSize)
         private set
 
-    fun cycleSubtitleLang() {
-        subtitleLang = when (subtitleLang) {
-            "tr" -> "en"
-            "en" -> "off"
-            else -> "tr"
-        }
-        prefs.subtitleLang = subtitleLang
+    var subtitleLang2 by mutableStateOf(prefs.subtitleLang2)
+        private set
+
+    fun setSubtitleLanguage(code: String) {
+        subtitleLang = code
+        prefs.subtitleLang = code
+    }
+
+    fun setSubtitleLanguage2(code: String) {
+        subtitleLang2 = code
+        prefs.subtitleLang2 = code
     }
 
     fun cycleSubtitleSize() {

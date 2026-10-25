@@ -48,6 +48,16 @@ class Prefs(ctx: Context) {
         get() = p.getString("subLang", "tr") ?: "tr"
         set(v) = p.edit().putString("subLang", v).apply()
 
+    /** Birinci dilde altyazı yoksa denenecek yedek dil ("off" = yok) */
+    var subtitleLang2: String
+        get() = p.getString("subLang2", "en") ?: "en"
+        set(v) = p.edit().putString("subLang2", v).apply()
+
+    /** Sırayla denenecek altyazı dilleri (en az bir dil; kapalıysa boş) */
+    val subtitleLangs: List<String>
+        get() = if (subtitleLang == "off") emptyList()
+        else listOf(subtitleLang, subtitleLang2).filter { it != "off" }.distinct()
+
     /** Altyazı boyutu çarpanı: 0 = küçük, 1 = normal, 2 = büyük */
     var subtitleSize: Int
         get() = p.getInt("subSize", 1)

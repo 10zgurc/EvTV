@@ -99,10 +99,9 @@ class VodPlayerActivity : ComponentActivity() {
         // ---- Altyazı ve ses tercihleri ----
         val selector = DefaultTrackSelector(this)
         val params = selector.buildUponParameters()
-        when (vm.subtitleLang) {
-            "off" -> params.setPreferredTextLanguage(null)
-            else -> params.setPreferredTextLanguage(vm.subtitleLang)
-        }
+        val langs = Prefs(this).subtitleLangs
+        if (langs.isEmpty()) params.setPreferredTextLanguage(null)
+        else params.setPreferredTextLanguages(*langs.toTypedArray())
         selector.setParameters(params)
 
         val http = DefaultHttpDataSource.Factory()
@@ -232,7 +231,6 @@ class VodPlayerActivity : ComponentActivity() {
         subList = ListView(this).apply {
             divider = null
             setSelector(GradientDrawable().apply { setColor(0xFF2B6BFF.toInt()); cornerRadius = dp(8).toFloat() })
-            setOnItemClickListener { _, _, pos, _ -> subResults.getOrNull(pos)?.let { pickSubtitle(it) } }
         }
         subPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -317,34 +315,45 @@ class VodPlayerActivity : ComponentActivity() {
 
     // ---------------- İnternetten altyazı ----------------
 
-    private fun prefLang() = prefs.subtitleLang.takeIf { it != "off" } ?: "tr"
+    /** Panelde aranacak diller: ayarlardaki diller, yoksa Türkçe + İngilizce */
+    private fun panelLangs(): List<String> = prefs.subtitleLangs.ifEmpty { listOf("tr", "en") }
 
-    /** Videonun içinde istenen dilde altyazı yoksa internetten otomatik bul. */
+    private fun hasEmbedded(tracks: Tracks, lang: String) = tracks.groups.any { g ->
+        g.type == MC.TRACK_TYPE_TEXT && (0 until g.length).any { i -> sameLang(g.getTrackFormat(i).language, lang) }
+    }
+
+    /**
+     * Videonun içinde birinci dilde altyazı yoksa internetten bul.
+     * Sıra: videodaki 1. dil → internetten 1. dil → videodaki yedek dil → internetten yedek dil.
+     */
     private fun maybeAutoSubtitle(tracks: Tracks) {
         val q = currentItem() ?: return
         if (!autoChecked.add(q.key)) return
-        if (prefs.subtitleLang == "off" || !prefs.osAuto) return
-        val lang = prefLang()
-        val hasEmbedded = tracks.groups.any { g ->
-            g.type == MC.TRACK_TYPE_TEXT && (0 until g.length).any { i ->
-                g.getTrackFormat(i).language?.lowercase()?.let { it == lang || it.startsWith("$lang-") || (lang == "tr" && it == "tur") || (lang == "en" && it == "eng") } == true
-            }
-        }
-        if (hasEmbedded) return
+        val langs = prefs.subtitleLangs
+        if (langs.isEmpty() || !prefs.osAuto) return
+        if (hasEmbedded(tracks, langs[0])) return
         // Daha önce indirildiyse doğrudan ekle
-        val cached = subs.cacheFile(q.key, lang)
-        if (cached.exists()) {
-            attachSubtitle(cached, lang, "İnternetten (${lang.uppercase()})")
-            return
+        for (l in langs) {
+            if (l != langs[0] && hasEmbedded(tracks, l)) break
+            val cached = subs.cacheFile(q.key, l)
+            if (cached.exists()) {
+                attachSubtitle(cached, l, "${langName(l)} (internet)")
+                return
+            }
         }
         if (!prefs.osConfigured || q.meta == null) return
         lifecycleScope.launch {
             try {
-                val best = subs.search(q.meta, listOf(lang)).firstOrNull { it.lang == lang } ?: return@launch
-                val f = subs.download(best, cached)
-                if (currentItem()?.key == q.key) {
-                    attachSubtitle(f, lang, "İnternetten (${lang.uppercase()})")
-                    toast("${langName(lang)} altyazı internetten eklendi")
+                val results = subs.search(q.meta, langs)
+                for (l in langs) {
+                    if (l != langs[0] && hasEmbedded(tracks, l)) return@launch // yedek dil videoda zaten var
+                    val best = results.firstOrNull { it.lang.equals(l, true) } ?: continue
+                    val f = subs.download(best, subs.cacheFile(q.key, l))
+                    if (currentItem()?.key == q.key) {
+                        attachSubtitle(f, l, "${langName(l)} (internet)")
+                        toast("${langName(l)} altyazı internetten eklendi")
+                    }
+                    return@launch
                 }
             } catch (e: Exception) {
                 // Otomatik denemede sessiz kal; kullanıcı panelden elle deneyebilir
@@ -352,20 +361,14 @@ class VodPlayerActivity : ComponentActivity() {
         }
     }
 
-    private fun langName(l: String) = when (l) {
-        "tr" -> "Türkçe"
-        "en" -> "İngilizce"
-        else -> l.uppercase()
-    }
-
     private fun openSubtitlePanel() {
         subPanel.visibility = View.VISIBLE
         view.hideController()
-        subList.adapter = null
-        subResults = emptyList()
         val q = currentItem()
         when {
             !prefs.osConfigured -> {
+                subList.adapter = null
+                subResults = emptyList()
                 subStatus.text = "Kullanmak için ana ekranda Ayarlar → İnternetten altyazı bölümüne ücretsiz OpenSubtitles.com " +
                     "hesabını ve API anahtarını gir.\n\nGeri: kapat"
                 subPanel.requestFocus()
@@ -376,40 +379,48 @@ class VodPlayerActivity : ComponentActivity() {
                 return
             }
         }
-        subStatus.text = "Aranıyor…"
-        val meta = q!!.meta!!
-        val first = prefLang()
-        val langs = listOf(first, if (first == "tr") "en" else "tr")
+        runSubtitleSearch(q!!.meta!!, panelLangs())
+    }
+
+    /** langs boşsa tüm dillerde arar. */
+    private fun runSubtitleSearch(meta: SubMeta, langs: List<String>) {
+        subList.adapter = null
+        subResults = emptyList()
+        subStatus.text = if (langs.isEmpty()) "Tüm dillerde aranıyor…" else "Aranıyor: ${langs.joinToString(", ") { langName(it) }}…"
         lifecycleScope.launch {
             try {
-                subResults = subs.search(meta, langs).take(60)
-                if (subResults.isEmpty()) {
-                    subStatus.text = "Altyazı bulunamadı."
-                    return@launch
+                val found = subs.search(meta, langs).take(if (langs.isEmpty()) 120 else 60)
+                // Listenin başında: "tüm dillerde ara" veya "seçili dillere dön"
+                val switchRow = if (langs.isEmpty()) "← Sadece ${panelLangs().joinToString(", ") { langName(it) }}"
+                else "🌐 Tüm dillerde ara (${SUB_LANGS.size}+ dil)"
+                subResults = found
+                subStatus.text = if (found.isEmpty()) "Altyazı bulunamadı." else "Seç ve orta tuşa bas (${found.size} sonuç)"
+                val rows = listOf(switchRow) + found.map { r ->
+                    val tags = listOfNotNull(
+                        langName(r.lang),
+                        if (r.machine) "otomatik çeviri" else null,
+                        if (r.hearingImpaired) "işitme engelli" else null,
+                        "${r.downloads} indirme",
+                    ).joinToString(" • ")
+                    "${r.release}\n$tags"
                 }
-                subStatus.text = "Seç ve orta tuşa bas (${subResults.size} sonuç)"
                 subList.adapter = object : ArrayAdapter<String>(
-                    this@VodPlayerActivity, android.R.layout.simple_list_item_1,
-                    subResults.map { r ->
-                        val tags = listOfNotNull(
-                            langName(r.lang),
-                            if (r.machine) "otomatik çeviri" else null,
-                            if (r.hearingImpaired) "işitme engelli" else null,
-                            "${r.downloads} indirme",
-                        ).joinToString(" • ")
-                        "${r.release}\n$tags"
-                    },
+                    this@VodPlayerActivity, android.R.layout.simple_list_item_1, rows,
                 ) {
                     override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
                         val v = super.getView(position, convertView, parent) as TextView
-                        v.setTextColor(Color.WHITE)
+                        v.setTextColor(if (position == 0) 0xFF8AB4FF.toInt() else Color.WHITE)
                         v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
                         v.maxLines = 3
                         return v
                     }
                 }
+                subList.setOnItemClickListener { _, _, pos, _ ->
+                    if (pos == 0) runSubtitleSearch(meta, if (langs.isEmpty()) panelLangs() else emptyList())
+                    else subResults.getOrNull(pos - 1)?.let { pickSubtitle(it) }
+                }
                 subList.requestFocus()
-                subList.setSelection(0)
+                subList.setSelection(if (found.isEmpty()) 0 else 1)
             } catch (e: Exception) {
                 subStatus.text = e.message ?: "Altyazı aranamadı."
             }

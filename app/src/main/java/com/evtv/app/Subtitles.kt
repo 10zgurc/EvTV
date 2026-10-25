@@ -100,7 +100,8 @@ class OpenSubtitles(private val ctx: Context, private val prefs: Prefs) {
     suspend fun search(meta: SubMeta, langs: List<String>): List<SubResult> = withContext(Dispatchers.IO) {
         // Parametreler alfabetik ve küçük harf olmalı (API öyle istiyor)
         val p = sortedMapOf<String, String>()
-        p["languages"] = langs.joinToString(",")
+        // Boş liste = tüm diller
+        if (langs.isNotEmpty()) p["languages"] = langs.joinToString(",") { it.lowercase() }
         if (meta.season != null && meta.episode != null) {
             p["type"] = "episode"
             p["season_number"] = meta.season.toString()
@@ -133,7 +134,7 @@ class OpenSubtitles(private val ctx: Context, private val prefs: Prefs) {
         }
         // Önce tercih edilen dil, sonra insan çevirisi, sonra en çok indirilen
         out.sortedWith(
-            compareBy<SubResult> { langs.indexOf(it.lang).let { i -> if (i < 0) 99 else i } }
+            compareBy<SubResult> { r -> langs.indexOfFirst { it.equals(r.lang, true) }.let { i -> if (i < 0) 99 else i } }
                 .thenBy { it.machine }
                 .thenBy { it.hearingImpaired }
                 .thenByDescending { it.downloads }

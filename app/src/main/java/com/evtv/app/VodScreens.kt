@@ -401,20 +401,43 @@ fun SearchPane(
 // Ayarlar
 // =====================================================================
 
+/** Basınca altında dil listesi açılır; seçince kapanır. */
+@Composable
+private fun LanguagePicker(title: String, value: String, allowOff: Boolean, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val selReq = remember { FocusRequester() }
+    FocusRow(onClick = { open = !open }) { f ->
+        Text(title, color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(langName(value) + if (open) "  ▲" else "  ▼", color = if (f) C.text else C.accent, fontSize = 17.sp)
+    }
+    if (open) {
+        val options = (if (allowOff) listOf("off" to "Kapalı") else emptyList()) + SUB_LANGS
+        LaunchedEffect(Unit) { focusWhenReady { selReq } }
+        Column(Modifier.padding(start = 28.dp)) {
+            for ((code, name) in options) {
+                FocusRow(
+                    modifier = if (code == value) Modifier.focusRequester(selReq) else Modifier,
+                    selected = code == value,
+                    onClick = {
+                        onPick(code)
+                        open = false
+                    },
+                ) { f ->
+                    Text(name, color = if (f || code == value) C.text else C.sub, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    if (code == value) Text("✓", color = C.text, fontSize = 16.sp)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsPane(vm: AppViewModel) {
     Column(Modifier.width(640.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         Text("Altyazı", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
-        FocusRow(onClick = { vm.cycleSubtitleLang() }) { f ->
-            Text("Otomatik altyazı dili", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
-            Text(
-                when (vm.subtitleLang) {
-                    "tr" -> "Türkçe"
-                    "en" -> "İngilizce"
-                    else -> "Kapalı"
-                },
-                color = if (f) C.text else C.accent, fontSize = 17.sp,
-            )
+        LanguagePicker("Birinci altyazı dili", vm.subtitleLang, allowOff = true) { vm.setSubtitleLanguage(it) }
+        if (vm.subtitleLang != "off") {
+            LanguagePicker("Yedek dil (birincisi yoksa)", vm.subtitleLang2, allowOff = true) { vm.setSubtitleLanguage2(it) }
         }
         FocusRow(onClick = { vm.cycleSubtitleSize() }) { f ->
             Text("Altyazı boyutu", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
@@ -435,7 +458,7 @@ fun SettingsPane(vm: AppViewModel) {
         Text("İnternetten altyazı (OpenSubtitles.com)", color = C.accent, fontSize = 16.sp,
             modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
         Text(
-            "Videoda Türkçe altyazı yoksa internetten otomatik bulur. opensubtitles.com'da ücretsiz hesap aç, " +
+            "Videoda seçtiğin dilde altyazı yoksa internetten otomatik bulur. opensubtitles.com'da ücretsiz hesap aç, " +
                 "Profil → API Consumers bölümünden bir API anahtarı oluştur ve aşağıya gir. " +
                 "İpucu: uzun anahtarı yazmak için telefondaki Google TV uygulamasının klavyesini kullanabilirsin.",
             color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, bottom = 8.dp),

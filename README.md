@@ -49,7 +49,8 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 
 ### İnternetten altyazı (OpenSubtitles.com)
 - Ayarlar'a ücretsiz OpenSubtitles hesabı + API anahtarı girilir.
-- Videoda Türkçe altyazı yoksa otomatik bulunur ve eklenir.
+- Birinci ve yedek altyazı dili 36 dil arasından seçilir; videoda o dilde altyazı yoksa internetten otomatik bulunur.
+- Elle seçim panelinde "Tüm dillerde ara" seçeneği vardır.
 - İzlerken Menü tuşu veya üstteki "İnternetten altyazı" düğmesiyle listeden elle seçilebilir.
 - Ücretsiz hesapta günlük indirme sınırı vardır (bir kez indirilen altyazı TV'de saklanır).
 
