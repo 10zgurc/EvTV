@@ -60,15 +60,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         else listOf(Category(CAT_ALL, "Tüm kanallar"), Category(CAT_FAV, "Favoriler")) + serverCategories
     }
 
-    private val categoryCounts by derivedStateOf {
-        allChannels.groupingBy { it.categoryId ?: "" }.eachCount()
+    /** Kanallar bir kez kategorilere ayrılır; kategori değiştirmek anında olur (60 bin+ kanalda bile). */
+    private val channelsByCategory by derivedStateOf {
+        allChannels.groupBy { it.categoryId ?: "" }
+    }
+
+    private val favoriteChannels by derivedStateOf {
+        allChannels.filter { it.streamId in favorites }
     }
 
     val visibleChannels by derivedStateOf {
         when (selectedCategoryId) {
             CAT_ALL -> allChannels
-            CAT_FAV -> allChannels.filter { it.streamId in favorites }
-            else -> allChannels.filter { it.categoryId == selectedCategoryId }
+            CAT_FAV -> favoriteChannels
+            else -> channelsByCategory[selectedCategoryId] ?: emptyList()
         }
     }
 
@@ -204,8 +209,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun countFor(catId: String): Int = when (catId) {
         CAT_ALL -> allChannels.size
-        CAT_FAV -> allChannels.count { it.streamId in favorites }
-        else -> categoryCounts[catId] ?: 0
+        CAT_FAV -> favoriteChannels.size
+        else -> channelsByCategory[catId]?.size ?: 0
     }
 
     fun selectCategory(id: String) {
