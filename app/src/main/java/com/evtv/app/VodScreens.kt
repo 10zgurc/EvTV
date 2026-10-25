@@ -434,6 +434,16 @@ private fun LanguagePicker(title: String, value: String, allowOff: Boolean, onPi
 @Composable
 fun SettingsPane(vm: AppViewModel) {
     Column(Modifier.width(640.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
+        Text("Oynatma", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
+        FocusRow(onClick = { vm.cycleBufferLevel() }) { f ->
+            Text("Donma önleme (tampon)", color = C.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(bufferLevelName(vm.bufferLevel), color = if (f) C.text else C.accent, fontSize = 17.sp)
+        }
+        Text(
+            "Donma oluyorsa \"Çok yüksek\" seç: kanal/film birkaç saniye geç açılır ama internet anlık yavaşladığında görüntü durmaz.",
+            color = C.sub, fontSize = 14.sp, modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 20.dp),
+        )
+
         Text("Altyazı", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
         LanguagePicker("Birinci altyazı dili", vm.subtitleLang, allowOff = true) { vm.setSubtitleLanguage(it) }
         if (vm.subtitleLang != "off") {

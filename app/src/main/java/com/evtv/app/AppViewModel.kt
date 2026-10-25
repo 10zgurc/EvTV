@@ -732,6 +732,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    var bufferLevel by mutableIntStateOf(prefs.bufferLevel)
+        private set
+
+    fun cycleBufferLevel() {
+        bufferLevel = (bufferLevel + 1) % 3
+        prefs.bufferLevel = bufferLevel
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()

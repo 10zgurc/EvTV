@@ -31,7 +31,7 @@
             android:name=".VodPlayerActivity"
             android:exported="false"
             android:screenOrientation="landscape"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:theme="@style/PlayerTheme"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation" />
     </application>
 </manifest>

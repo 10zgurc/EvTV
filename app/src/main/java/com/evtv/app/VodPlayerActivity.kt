@@ -4,7 +4,12 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
+import android.view.ViewGroup
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -41,6 +46,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import kotlinx.coroutines.async
@@ -116,6 +122,7 @@ class VodPlayerActivity : ComponentActivity() {
 
         player = ExoPlayer.Builder(this, renderers)
             .setTrackSelector(selector)
+            .setLoadControl(buildLoadControl(prefs.bufferLevel, live = false))
             // DefaultDataSource: hem internet hem de indirilen altyazı dosyası okunabilsin
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http)))
             .setSeekBackIncrementMs(10_000)
@@ -289,6 +296,8 @@ class VodPlayerActivity : ComponentActivity() {
             addView(subPanel, FrameLayout.LayoutParams(dp(560), -1, Gravity.END))
         }
         setContentView(root)
+        // Kumandayla seçili düğme net görünsün
+        view.post { styleControls(view) }
         updateTitle()
         view.requestFocus()
 
@@ -304,6 +313,56 @@ class VodPlayerActivity : ComponentActivity() {
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    /**
+     * Oynatıcı düğmelerine belirgin odak görünümü: seçili düğme mavi daire içinde ve büyür;
+     * ilerleme çubuğu seçiliyken mavi çerçeve alır.
+     */
+    private fun styleControls(v: View) {
+        if (v === view.subtitleView) return
+        when (v) {
+            is DefaultTimeBar -> {
+                v.setPlayedColor(0xFF4C8DFF.toInt())
+                v.setScrubberColor(Color.WHITE)
+                v.setBufferedColor(0x88FFFFFF.toInt())
+                v.setUnplayedColor(0x44FFFFFF)
+                v.background = StateListDrawable().apply {
+                    addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+                        setColor(0x332B6BFF)
+                        setStroke(dp(2), 0xFF4C8DFF.toInt())
+                        cornerRadius = dp(8).toFloat()
+                    })
+                    addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
+                }
+                v.setOnFocusChangeListener { _, has ->
+                    if (has) {
+                        view.controllerShowTimeoutMs = 6_000
+                        view.showController()
+                    }
+                }
+            }
+            is ImageButton, is ImageView -> if (v.isFocusable || v.isClickable) {
+                v.background = StateListDrawable().apply {
+                    addState(intArrayOf(android.R.attr.state_focused), GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(0xFF2B6BFF.toInt())
+                        setStroke(dp(2), Color.WHITE)
+                    })
+                    addState(intArrayOf(android.R.attr.state_pressed), GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(0xFF1E4FCC.toInt())
+                    })
+                    addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
+                }
+                v.setOnFocusChangeListener { b, has ->
+                    val sc = if (has) 1.3f else 1f
+                    b.animate().scaleX(sc).scaleY(sc).setDuration(120).start()
+                    if (has) view.showController() // gezinirken kontroller kaybolmasın
+                }
+            }
+            is ViewGroup -> for (i in 0 until v.childCount) styleControls(v.getChildAt(i))
+        }
+    }
 
     private fun buttonBg(focused: Boolean) = GradientDrawable().apply {
         setColor(if (focused) 0xFF2B6BFF.toInt() else 0x66000000)

@@ -97,6 +97,7 @@ fun PlayerScreen(vm: AppViewModel) {
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         ExoPlayer.Builder(ctx, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(http))
+            .setLoadControl(buildLoadControl(Prefs(ctx).bufferLevel, live = true))
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(MC.USAGE_MEDIA).setContentType(MC.AUDIO_CONTENT_TYPE_MOVIE).build(),
                 true,

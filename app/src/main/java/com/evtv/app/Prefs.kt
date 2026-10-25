@@ -89,6 +89,11 @@ class Prefs(ctx: Context) {
 
     val osConfigured: Boolean get() = osKey.isNotBlank() && osUser.isNotBlank() && osPass.isNotBlank()
 
+    /** Tampon (donma önleme): 0 = normal, 1 = yüksek, 2 = çok yüksek */
+    var bufferLevel: Int
+        get() = p.getInt("buffer", 1)
+        set(v) = p.edit().putInt("buffer", v).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */
