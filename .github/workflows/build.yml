@@ -22,9 +22,16 @@ jobs:
 
       - name: APK derle
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log
           cp app/build/outputs/apk/release/app-release.apk EvTV.apk
+
+      - name: Hataları özetle
+        if: failure()
+        run: |
+          msg=$(grep -E "^e: |What went wrong|Could not (find|resolve)|error:" -A2 build.log | head -60 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')
+          echo "::error title=Derleme hatası::$msg"
 
       - name: APK'yı indirilebilir dosya olarak yükle
         uses: actions/upload-artifact@v4

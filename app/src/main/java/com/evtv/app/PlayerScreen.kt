@@ -92,7 +92,9 @@ fun PlayerScreen(vm: AppViewModel) {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
-        val renderers = DefaultRenderersFactory(ctx).setEnableDecoderFallback(true)
+        val renderers = DefaultRenderersFactory(ctx)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         ExoPlayer.Builder(ctx, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(http))
             .setAudioAttributes(

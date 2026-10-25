@@ -12,8 +12,8 @@ android {
         applicationId = "com.evtv.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     // Sabit imza: her yeni sürüm eskisinin üzerine kurulur, favoriler silinmez
@@ -45,6 +45,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     // Lint uyarıları derlemeyi durdurmasın
     lint {
@@ -66,9 +67,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Video oynatıcı
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media3:media3-exoplayer:1.5.0")
+    implementation("androidx.media3:media3-exoplayer-hls:1.5.0")
+    implementation("androidx.media3:media3-ui:1.5.0")
+    // Dolby (AC3/E-AC3), DTS, TrueHD gibi TV'nin çözemediği sesler için yazılım çözücü
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
 
     // Kanal logoları
     implementation("io.coil-kt:coil-compose:2.7.0")

@@ -49,7 +49,7 @@ import java.util.Locale
 fun hm(t: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(t))
 
 /** Lazy listede henüz çizilmemiş bir satıra odak verebilmek için birkaç kare bekleyip dener. */
-private suspend fun focusWhenReady(get: () -> FocusRequester?): Boolean {
+suspend fun focusWhenReady(get: () -> FocusRequester?): Boolean {
     repeat(20) {
         withFrameNanos { }
         val r = get()
@@ -60,7 +60,7 @@ private suspend fun focusWhenReady(get: () -> FocusRequester?): Boolean {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun HomeScreen(vm: AppViewModel, catState: LazyListState, chState: LazyListState) {
+fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, tabReq: FocusRequester) {
     val channels = vm.visibleChannels
     val categories = vm.categories
     var focused by remember { mutableStateOf<Channel?>(null) }
@@ -79,8 +79,9 @@ fun HomeScreen(vm: AppViewModel, catState: LazyListState, chState: LazyListState
 
     // Açılışta veya oynatıcıdan dönünce odağı doğru yere koy
     LaunchedEffect(vm.pendingFocus, categories.isNotEmpty()) {
+        if (vm.pendingFocus == FocusTarget.None) return@LaunchedEffect
         if (categories.isEmpty()) {
-            focusWhenReady { fallbackReq }
+            if (!focusWhenReady { fallbackReq }) focusWhenReady { tabReq }
             return@LaunchedEffect
         }
         var done = false
@@ -99,19 +100,9 @@ fun HomeScreen(vm: AppViewModel, catState: LazyListState, chState: LazyListState
         vm.pendingFocus = FocusTarget.None
     }
 
-    Row(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp)) {
+    Row(Modifier.fillMaxSize()) {
         // ---- Sol: kategoriler ----
         Column(Modifier.width(300.dp).fillMaxHeight()) {
-            Row(
-                Modifier.padding(start = 14.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("EvTV", color = C.accent, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                if (vm.refreshing) {
-                    CircularProgressIndicator(color = C.sub, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-                }
-            }
             LazyColumn(state = catState, modifier = Modifier.weight(1f).focusRestorer()) {
                 items(categories, key = { it.id }) { cat ->
                     val fr = remember { FocusRequester() }
@@ -133,16 +124,6 @@ fun HomeScreen(vm: AppViewModel, catState: LazyListState, chState: LazyListState
                             modifier = Modifier.weight(1f),
                         )
                         Text("${vm.countFor(cat.id)}", color = if (f) C.text else C.sub, fontSize = 14.sp)
-                    }
-                }
-                if (categories.isNotEmpty()) {
-                    item(key = "__actions") {
-                        Column(Modifier.padding(top = 20.dp)) {
-                            FocusRow(onClick = { if (!vm.refreshing) vm.load() }) {
-                                Text(if (vm.refreshing) "Yenileniyor…" else "Listeyi yenile", color = C.sub, fontSize = 15.sp)
-                            }
-                            LogoutRow(vm)
-                        }
                     }
                 }
             }
@@ -207,7 +188,7 @@ fun HomeScreen(vm: AppViewModel, catState: LazyListState, chState: LazyListState
 
 /** Kazara çıkışı önlemek için iki kez basmak gerekir. */
 @Composable
-private fun LogoutRow(vm: AppViewModel) {
+fun LogoutRow(vm: AppViewModel) {
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) {
         if (armed) {
@@ -224,7 +205,7 @@ private fun LogoutRow(vm: AppViewModel) {
 }
 
 @Composable
-private fun CenterBox(content: @Composable () -> Unit) {
+fun CenterBox(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) { content() }
     }
@@ -297,7 +278,6 @@ private fun ChannelHeader(vm: AppViewModel, ch: Channel?) {
                 EpgLines(vm.epg[ch.streamId], vm.now)
             }
         }
-        Text(hm(vm.now), color = C.sub, fontSize = 20.sp)
     }
 }
 

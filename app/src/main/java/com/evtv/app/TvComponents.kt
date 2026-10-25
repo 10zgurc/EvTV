@@ -91,6 +91,7 @@ fun Modifier.tvClickable(onClick: () -> Unit, onLongClick: (() -> Unit)? = null)
 fun FocusRow(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    fill: Boolean = true,
     onFocused: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
@@ -105,7 +106,7 @@ fun FocusRow(
     }
     Row(
         modifier
-            .fillMaxWidth()
+            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .padding(vertical = 2.dp)
             .onFocusChanged {
                 focused = it.isFocused

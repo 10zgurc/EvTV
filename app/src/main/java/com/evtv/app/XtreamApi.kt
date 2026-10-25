@@ -63,7 +63,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    private fun open(query: String): HttpURLConnection {
+    internal fun open(query: String): HttpURLConnection {
         val url = URL("$base/player_api.php?username=${enc(user)}&password=${enc(pass)}$query")
         val c = url.openConnection() as HttpURLConnection
         c.connectTimeout = 15_000
@@ -84,7 +84,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
         return c
     }
 
-    private suspend fun fetchText(query: String): String = withContext(Dispatchers.IO) {
+    internal suspend fun fetchText(query: String): String = withContext(Dispatchers.IO) {
         val c = open(query)
         try {
             c.inputStream.bufferedReader().use { it.readText() }
@@ -94,7 +94,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
     }
 
     /** Büyük yanıtları belleğe tamamen almadan, parça parça okur. */
-    private suspend fun <T> streamArray(query: String, parse: (Map<String, String?>, Int) -> T?): List<T> =
+    internal suspend fun <T> streamArray(query: String, parse: (Map<String, String?>, Int) -> T?): List<T> =
         withContext(Dispatchers.IO) {
             val c = open(query)
             try {
@@ -123,7 +123,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
             }
         }
 
-    private fun readFlatObject(r: JsonReader): Map<String, String?> {
+    internal fun readFlatObject(r: JsonReader): Map<String, String?> {
         val m = HashMap<String, String?>(16)
         r.beginObject()
         while (r.hasNext()) {
@@ -205,7 +205,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
         }.filter { it.end > now }.sortedBy { it.start }
     }
 
-    private fun decode(s: String): String {
+    internal fun decode(s: String): String {
         if (s.isBlank()) return "Program"
         return try {
             val d = String(Base64.decode(s, Base64.DEFAULT), Charsets.UTF_8).trim()
@@ -218,4 +218,10 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
 
     fun streamUrl(streamId: Int, ext: String): String =
         "$base/live/${Uri.encode(user)}/${Uri.encode(pass)}/$streamId.$ext"
+
+    fun movieUrl(id: Int, ext: String): String =
+        "$base/movie/${Uri.encode(user)}/${Uri.encode(pass)}/$id.$ext"
+
+    fun episodeUrl(id: String, ext: String): String =
+        "$base/series/${Uri.encode(user)}/${Uri.encode(pass)}/$id.$ext"
 }

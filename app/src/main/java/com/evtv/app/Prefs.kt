@@ -31,6 +31,28 @@ class Prefs(ctx: Context) {
         get() = (p.getStringSet("fav", emptySet()) ?: emptySet()).mapNotNull { it.toIntOrNull() }.toSet()
         set(v) = p.edit().putStringSet("fav", v.map { it.toString() }.toSet()).apply()
 
+    var lastSection: String
+        get() = p.getString("section", "Live") ?: "Live"
+        set(v) = p.edit().putString("section", v).apply()
+
+    var lastMovieCat: String
+        get() = p.getString("movieCat", "") ?: ""
+        set(v) = p.edit().putString("movieCat", v).apply()
+
+    var lastSeriesCat: String
+        get() = p.getString("seriesCat", "") ?: ""
+        set(v) = p.edit().putString("seriesCat", v).apply()
+
+    /** Tercih edilen altyazı dili: "tr", "en" veya "off" */
+    var subtitleLang: String
+        get() = p.getString("subLang", "tr") ?: "tr"
+        set(v) = p.edit().putString("subLang", v).apply()
+
+    /** Altyazı boyutu çarpanı: 0 = küçük, 1 = normal, 2 = büyük */
+    var subtitleSize: Int
+        get() = p.getInt("subSize", 1)
+        set(v) = p.edit().putInt("subSize", v).apply()
+
     val hasAccount: Boolean get() = server.isNotBlank() && user.isNotBlank()
 
     /** Önbelleğin hangi hesaba ait olduğunu anlamak için. */

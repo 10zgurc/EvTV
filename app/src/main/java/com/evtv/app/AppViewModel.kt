@@ -18,10 +18,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Login, Home, Player }
+enum class Screen { Login, Home, Player, Detail }
+
+enum class Section { Live, Movies, Series, Settings }
 
 const val CAT_ALL = "__all"
 const val CAT_FAV = "__fav"
+const val CAT_RECENT = "__recent"
 
 private const val EPG_MAX_AGE = 15 * 60_000L
 
@@ -29,6 +32,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = Prefs(app)
     private val cache = ChannelCache(app)
+    val watch = WatchStore(app)
     private var api: XtreamApi? = null
     private var loadJob: Job? = null
 
@@ -133,8 +137,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     if (!sameAccount) {
                         // Başka hesaba geçildi: eski önbellek ve kategori seçimi geçersiz
                         cache.clear()
+                        watch.clear()
                         selectedCategoryId = CAT_ALL
                         prefs.lastCategory = CAT_ALL
+                        prefs.lastMovieCat = ""
+                        prefs.lastSeriesCat = ""
                     }
                     prefs.server = a.base
                     prefs.user = user
@@ -303,6 +310,310 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         error = null
     }
 
+    // =====================================================================
+    // Filmler ve diziler
+    // =====================================================================
+
+    var section by mutableStateOf(
+        runCatching { Section.valueOf(prefs.lastSection) }.getOrDefault(Section.Live)
+            .let { if (it == Section.Settings) Section.Live else it }
+    )
+        private set
+
+    var movieCats by mutableStateOf<List<Category>>(emptyList())
+        private set
+    var seriesCats by mutableStateOf<List<Category>>(emptyList())
+        private set
+    var vodCatsLoading by mutableStateOf(false)
+        private set
+    var vodCatsError by mutableStateOf<String?>(null)
+        private set
+
+    var selectedMovieCat by mutableStateOf(prefs.lastMovieCat)
+        private set
+    var selectedSeriesCat by mutableStateOf(prefs.lastSeriesCat)
+        private set
+
+    /** Kategori başına yüklenen listeler: "m:<kategori>" / "s:<kategori>" */
+    val vodItems = mutableStateMapOf<String, List<VodItem>>()
+    val vodErrors = mutableStateMapOf<String, String>()
+    private val vodLoading = HashSet<String>()
+
+    /** İlerleme/izleme geçmişi değişince arayüz yeniden okusun diye. */
+    var watchVersion by mutableIntStateOf(0)
+        private set
+
+    /** Ana ekrana dönünce odaklanılacak film/dizi. */
+    var lastVodId: Int? = null
+    var vodFocusPending by mutableStateOf(false)
+
+    fun selectSection(s: Section) {
+        if (section == s) return
+        section = s
+        if (s != Section.Settings) prefs.lastSection = s.name
+        if (s == Section.Movies || s == Section.Series) ensureVodCategories()
+    }
+
+    fun vodCategoriesFor(series: Boolean): List<Category> {
+        val cats = if (series) seriesCats else movieCats
+        if (cats.isEmpty()) return emptyList()
+        return listOf(Category(CAT_RECENT, "İzlemeye devam et")) + cats
+    }
+
+    fun selectedVodCat(series: Boolean) = if (series) selectedSeriesCat else selectedMovieCat
+
+    fun selectVodCategory(series: Boolean, id: String) {
+        if (series) {
+            if (selectedSeriesCat == id) return
+            selectedSeriesCat = id
+            prefs.lastSeriesCat = id
+        } else {
+            if (selectedMovieCat == id) return
+            selectedMovieCat = id
+            prefs.lastMovieCat = id
+        }
+        if (id != CAT_RECENT) loadVodItems(series, id)
+    }
+
+    fun ensureVodCategories(force: Boolean = false) {
+        val a = api ?: return
+        if (vodCatsLoading) return
+        if (!force && movieCats.isNotEmpty() && seriesCats.isNotEmpty()) return
+        viewModelScope.launch {
+            vodCatsLoading = true
+            vodCatsError = null
+            try {
+                coroutineScope {
+                    val m = async { runCatching { a.vodCategories() } }
+                    val se = async { runCatching { a.seriesCategories() } }
+                    val mr = m.await()
+                    val sr = se.await()
+                    mr.getOrNull()?.let { movieCats = it }
+                    sr.getOrNull()?.let { seriesCats = it }
+                    val ex = mr.exceptionOrNull() ?: sr.exceptionOrNull()
+                    if (ex is Exception && (movieCats.isEmpty() || seriesCats.isEmpty())) {
+                        vodCatsError = "Kategoriler yüklenemedi: ${friendly(ex)}"
+                    }
+                }
+                // Kayıtlı kategori artık yoksa "İzlemeye devam et" ya da ilk kategori
+                fun pick(cur: String, cats: List<Category>, series: Boolean): String = when {
+                    cur == CAT_RECENT -> cur
+                    cats.any { it.id == cur } -> cur
+                    watch.recents(series).isNotEmpty() -> CAT_RECENT
+                    else -> cats.firstOrNull()?.id ?: ""
+                }
+                selectedMovieCat = pick(selectedMovieCat, movieCats, false).also { prefs.lastMovieCat = it }
+                selectedSeriesCat = pick(selectedSeriesCat, seriesCats, true).also { prefs.lastSeriesCat = it }
+                if (selectedMovieCat.isNotBlank() && selectedMovieCat != CAT_RECENT) loadVodItems(false, selectedMovieCat)
+                if (selectedSeriesCat.isNotBlank() && selectedSeriesCat != CAT_RECENT) loadVodItems(true, selectedSeriesCat)
+            } finally {
+                vodCatsLoading = false
+            }
+        }
+    }
+
+    fun vodKey(series: Boolean, cat: String) = (if (series) "s:" else "m:") + cat
+
+    fun visibleVod(series: Boolean): List<VodItem>? {
+        val cat = selectedVodCat(series)
+        if (cat == CAT_RECENT) {
+            watchVersion // değişiklikleri izle
+            return watch.recents(series)
+        }
+        return vodItems[vodKey(series, cat)]
+    }
+
+    fun loadVodItems(series: Boolean, cat: String, force: Boolean = false) {
+        val a = api ?: return
+        val key = vodKey(series, cat)
+        if ((!force && vodItems.containsKey(key)) || !vodLoading.add(key)) return
+        vodErrors.remove(key)
+        viewModelScope.launch {
+            try {
+                vodItems[key] = if (series) a.seriesList(cat) else a.vodStreams(cat)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                vodErrors[key] = "Liste yüklenemedi: ${friendly(e)}"
+            } finally {
+                vodLoading.remove(key)
+            }
+        }
+    }
+
+    // ---- Detay ekranı ----
+
+    var detailItem by mutableStateOf<VodItem?>(null)
+        private set
+    var movieInfo by mutableStateOf<MovieInfo?>(null)
+        private set
+    var seriesInfo by mutableStateOf<SeriesInfo?>(null)
+        private set
+    var detailLoading by mutableStateOf(false)
+        private set
+    var detailError by mutableStateOf<String?>(null)
+        private set
+    var selectedSeason by mutableIntStateOf(1)
+    private var detailJob: Job? = null
+
+    fun openDetail(item: VodItem) {
+        lastVodId = item.id
+        detailItem = item
+        movieInfo = null
+        seriesInfo = null
+        screen = Screen.Detail
+        loadDetail()
+    }
+
+    fun loadDetail() {
+        val a = api ?: return
+        val item = detailItem ?: return
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            detailLoading = true
+            detailError = null
+            try {
+                if (item.isSeries) {
+                    val info = a.seriesInfo(item.id)
+                    seriesInfo = info
+                    // Son izlenen bölümün sezonunu aç
+                    val last = watch.lastEpisode(item.id)
+                    val lastSeason = info.seasons.entries.firstOrNull { e -> e.value.any { it.id == last } }?.key
+                    selectedSeason = lastSeason ?: info.seasons.keys.firstOrNull() ?: 1
+                } else {
+                    movieInfo = a.movieInfo(item.id)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                detailError = "Bilgiler yüklenemedi: ${friendly(e)}"
+            } finally {
+                detailLoading = false
+            }
+        }
+    }
+
+    fun backFromDetail() {
+        detailJob?.cancel()
+        vodFocusPending = true
+        screen = Screen.Home
+    }
+
+    fun removeFromRecents(item: VodItem) {
+        watch.forget(item)
+        watchVersion++
+    }
+
+    // ---- Film/dizi oynatma (ayrı oynatıcı ekranında) ----
+
+    /** Oynatıcıya verilecek sıra: film için tek öğe, dizi için seçilen bölümden sona kadar. */
+    var vodQueue by mutableStateOf<List<VodPlay>>(emptyList())
+        private set
+    /** Her artışta oynatıcı ekranı açılır. */
+    var vodLaunchToken by mutableIntStateOf(0)
+        private set
+    var vodLaunchHandled = 0
+
+    fun playMovie(fromStart: Boolean) {
+        val a = api ?: return
+        val item = detailItem ?: return
+        val ext = movieInfo?.ext ?: item.ext
+        val key = "m${item.id}"
+        watch.touch(item.copy(ext = ext))
+        watchVersion++
+        vodQueue = listOf(
+            VodPlay(
+                key = key,
+                title = item.name,
+                subtitle = movieInfo?.year,
+                url = a.movieUrl(item.id, ext),
+                startMs = if (fromStart) 0L else watch.position(key),
+                hasNext = false,
+            )
+        )
+        vodLaunchToken++
+    }
+
+    fun allEpisodes(): List<Episode> =
+        seriesInfo?.seasons?.values?.flatten() ?: emptyList()
+
+    /** Dizide "devam et": yarım kalan ya da sıradaki izlenmemiş bölüm. */
+    fun resumeEpisode(): Episode? {
+        val item = detailItem ?: return null
+        val eps = allEpisodes()
+        if (eps.isEmpty()) return null
+        val last = watch.lastEpisode(item.id)
+        val i = eps.indexOfFirst { it.id == last }
+        if (i < 0) return eps.first()
+        return if (watch.isDone("e${eps[i].id}")) eps.getOrNull(i + 1) ?: eps[i] else eps[i]
+    }
+
+    fun playEpisode(ep: Episode, fromStart: Boolean = false) {
+        val a = api ?: return
+        val item = detailItem ?: return
+        val eps = allEpisodes()
+        val start = eps.indexOfFirst { it.id == ep.id }.coerceAtLeast(0)
+        val rest = eps.drop(start).ifEmpty { listOf(ep) }
+        vodQueue = rest.mapIndexed { i, e ->
+            val key = "e${e.id}"
+            VodPlay(
+                key = key,
+                title = item.name,
+                subtitle = "S${e.season} B${e.num} • ${e.title}",
+                url = a.episodeUrl(e.id, e.ext),
+                startMs = if (i == 0 && !fromStart) watch.position(key) else 0L,
+                hasNext = i < rest.size - 1,
+            )
+        }
+        onEpisodeStarted(ep.id)
+        vodLaunchToken++
+    }
+
+    /** Oynatıcı yeni bölüme geçince çağrılır. */
+    fun onEpisodeStarted(episodeId: String) {
+        val item = detailItem ?: return
+        watch.touch(item)
+        watch.setLastEpisode(item.id, episodeId)
+        allEpisodes().firstOrNull { it.id == episodeId }?.let { selectedSeason = it.season }
+        watchVersion++
+    }
+
+    fun markDone(key: String) {
+        watch.markDone(key)
+        watchVersion++
+    }
+
+    fun savePosition(key: String, posMs: Long, durMs: Long) {
+        watch.save(key, posMs, durMs)
+        watchVersion++
+    }
+
+    fun onVodPlayerClosed() {
+        vodQueue = emptyList()
+        watchVersion++
+    }
+
+    // ---- Altyazı ayarları ----
+
+    var subtitleLang by mutableStateOf(prefs.subtitleLang)
+        private set
+    var subtitleSize by mutableIntStateOf(prefs.subtitleSize)
+        private set
+
+    fun cycleSubtitleLang() {
+        subtitleLang = when (subtitleLang) {
+            "tr" -> "en"
+            "en" -> "off"
+            else -> "tr"
+        }
+        prefs.subtitleLang = subtitleLang
+    }
+
+    fun cycleSubtitleSize() {
+        subtitleSize = (subtitleSize + 1) % 3
+        prefs.subtitleSize = subtitleSize
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()
@@ -313,6 +624,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         playList = emptyList()
         epg.clear()
         epgFetchedAt.clear()
+        movieCats = emptyList()
+        seriesCats = emptyList()
+        vodItems.clear()
+        vodErrors.clear()
+        watch.clear()
         error = null
         loading = false
         refreshing = false
@@ -321,3 +637,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 enum class FocusTarget { Category, LastChannel, None }
+
+/** Oynatılacak film veya bölüm. */
+data class VodPlay(
+    val key: String,
+    val title: String,
+    val subtitle: String?,
+    val url: String,
+    val startMs: Long,
+    val hasNext: Boolean,
+)
