@@ -231,7 +231,7 @@ class VodPlayerActivity : ComponentActivity() {
         }
         subList = ListView(this).apply {
             divider = null
-            selector = GradientDrawable().apply { setColor(0xFF2B6BFF.toInt()); cornerRadius = dp(8).toFloat() }
+            setSelector(GradientDrawable().apply { setColor(0xFF2B6BFF.toInt()); cornerRadius = dp(8).toFloat() })
             setOnItemClickListener { _, _, pos, _ -> subResults.getOrNull(pos)?.let { pickSubtitle(it) } }
         }
         subPanel = LinearLayout(this).apply {
