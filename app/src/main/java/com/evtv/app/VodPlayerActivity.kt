@@ -234,6 +234,8 @@ class VodPlayerActivity : ComponentActivity() {
             )
             addView(titleCol, LinearLayout.LayoutParams(0, -2, 1f))
             addView(subButton, LinearLayout.LayoutParams(-2, -2))
+            // Başta gizli; film başlarken kısa süre gösterilir, sonra kontrollerle birlikte açılır
+            visibility = View.GONE
         }
 
         // ---- İnternetten altyazı paneli (sağda) ----
@@ -598,11 +600,19 @@ class VodPlayerActivity : ComponentActivity() {
 
     private fun currentItem(): VodPlay? = queue.getOrNull(player.currentMediaItemIndex)
 
+    private val hideTitle = Runnable {
+        if (!view.isControllerFullyVisible && !subButton.hasFocus()) titleBox.visibility = View.GONE
+    }
+
     private fun updateTitle() {
         val q = currentItem() ?: return
         titleText.text = q.title
         subText.text = q.subtitle.orEmpty()
         subText.visibility = if (q.subtitle.isNullOrBlank()) View.GONE else View.VISIBLE
+        // Film/bölüm başlarken adını 4 sn göster
+        titleBox.visibility = View.VISIBLE
+        handler.removeCallbacks(hideTitle)
+        handler.postDelayed(hideTitle, 4_000)
     }
 
     private fun showMessage(text: String) {
