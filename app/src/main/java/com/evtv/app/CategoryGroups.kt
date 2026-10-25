@@ -126,7 +126,8 @@ fun groupCategories(cats: List<Category>): List<CatGroup>? {
 // =====================================================================
 
 sealed class CatRow(val key: String) {
-    class Back(val group: CatGroup) : CatRow("back")
+    // Ülke satırı ile "‹ Ülke" satırı aynı anahtarı paylaşır: açıp kapatırken odak kaybolmaz
+    class Back(val group: CatGroup) : CatRow("g:" + group.code)
     class Group(val group: CatGroup) : CatRow("g:" + group.code)
     class Cat(val cat: Category) : CatRow(cat.id)
 }
@@ -189,30 +190,36 @@ fun CategoryColumn(
                 onDispose { if (catReq[row.key] === fr) catReq.remove(row.key) }
             }
             when (row) {
-                is CatRow.Back -> FocusRow(
-                    modifier = Modifier.focusRequester(fr),
-                    onClick = { closeGroup(row.group.code) },
-                ) { f ->
-                    Text("‹  ${row.group.flag}  ${row.group.name}", color = if (f) C.text else C.accent,
-                        fontSize = fontSize.sp, fontWeight = FontWeight.Bold, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                }
-                is CatRow.Group -> {
-                    val hasSel = row.group.cats.any { it.id == selected }
+                // Ülke satırı ve "‹ Ülke" satırı tek bir FocusRow: aynı düğüm kalır, odak kaymaz
+                is CatRow.Back, is CatRow.Group -> {
+                    val g = if (row is CatRow.Back) row.group else (row as CatRow.Group).group
+                    val back = row is CatRow.Back
+                    val hasSel = !back && g.cats.any { it.id == selected }
                     FocusRow(
                         modifier = Modifier.focusRequester(fr),
                         selected = hasSel,
                         onClick = {
-                            deb.cancel()
-                            vm.setOpenGroup(type, row.group.code)
-                            val first = row.group.cats.firstOrNull()?.id
-                            if (first != null) focusKeyLater(first, 1)
+                            if (back) {
+                                closeGroup(g.code)
+                            } else {
+                                deb.cancel()
+                                vm.setOpenGroup(type, g.code)
+                                val first = g.cats.firstOrNull()?.id
+                                if (first != null) focusKeyLater(first, 1)
+                            }
                         },
                     ) { f ->
-                        Text("${row.group.flag}  ${row.group.name}", color = if (f || hasSel) C.text else C.sub,
-                            fontSize = fontSize.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text("${row.group.cats.size} ›", color = if (f) C.text else C.sub, fontSize = 14.sp)
+                        Text(
+                            if (back) "‹  ${g.flag}  ${g.name}" else "${g.flag}  ${g.name}",
+                            color = when {
+                                back && !f -> C.accent
+                                f || hasSel -> C.text
+                                else -> C.sub
+                            },
+                            fontSize = fontSize.sp, fontWeight = if (back) FontWeight.Bold else FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                        )
+                        if (!back) Text("${g.cats.size} ›", color = if (f) C.text else C.sub, fontSize = 14.sp)
                     }
                 }
                 is CatRow.Cat -> {
@@ -223,6 +230,7 @@ fun CategoryColumn(
                             .flushOnKey(deb, android.view.KeyEvent.KEYCODE_DPAD_RIGHT, scope, fm, FocusDirection.Right),
                         selected = isSel,
                         onFocused = { deb.submit(cat.id) },
+                        onBlur = { deb.cancelIf(cat.id) },
                         onClick = { deb.cancel(); onClickCat(cat.id) },
                     ) { f ->
                         Text(if (inGroup) stripPrefix(label(cat)) else label(cat), color = if (f || isSel) C.text else C.sub, fontSize = fontSize.sp,

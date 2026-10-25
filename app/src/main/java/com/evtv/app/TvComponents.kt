@@ -97,6 +97,7 @@ fun FocusRow(
     selected: Boolean = false,
     fill: Boolean = true,
     onFocused: () -> Unit = {},
+    onBlur: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
     content: @Composable RowScope.(focused: Boolean) -> Unit,
@@ -113,8 +114,9 @@ fun FocusRow(
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .padding(vertical = 2.dp)
             .onFocusChanged {
+                val was = focused
                 focused = it.isFocused
-                if (it.isFocused) onFocused()
+                if (it.isFocused) onFocused() else if (was) onBlur()
             }
             .tvClickable(onClick, onLongClick)
             .clip(shape)
@@ -162,6 +164,11 @@ class Debouncer<T>(
     fun cancel() {
         job?.cancel()
         pending = null
+    }
+
+    /** Odak bu öğeden ayrıldıysa ve hâlâ bekleyen seçim oysa iptal et */
+    fun cancelIf(value: T) {
+        if (pending == value) cancel()
     }
 }
 

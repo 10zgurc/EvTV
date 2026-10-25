@@ -123,6 +123,8 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
                         fill = false,
                         selected = vm.section == s,
                         onFocused = { tabDeb.submit(s) },
+                        // Odak sekmenin üzerinden kayıp gittiyse o bölüme geçme
+                        onBlur = { tabDeb.cancelIf(s) },
                         onClick = { tabDeb.cancel(); vm.selectSection(s) },
                     ) { f ->
                         Text(label, color = if (f || vm.section == s) C.text else C.sub, fontSize = 16.sp,
