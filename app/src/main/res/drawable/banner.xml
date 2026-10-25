@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV ana ekranında görünen 320x180 afiş -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#0E1014" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#2B6BFF" android:pathData="M0,150h320v30h-320z" />
+    <!-- TV kasası -->
+    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="6"
+        android:pathData="M110,35h100a10,10 0,0 1,10 10v60a10,10 0,0 1,-10 10h-100a10,10 0,0 1,-10 -10v-60a10,10 0,0 1,10 -10z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M140,125h40v6h-40z" />
+    <!-- Oynat üçgeni -->
+    <path android:fillColor="#4C8DFF" android:pathData="M148,55L148,95L180,75Z" />
+</vector>

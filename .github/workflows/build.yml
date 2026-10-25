@@ -1,0 +1,40 @@
+name: APK oluştur
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK derle
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk EvTV.apk
+
+      - name: APK'yı indirilebilir dosya olarak yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: EvTV-apk
+          path: EvTV.apk
+
+      - name: "Releases sayfasına koy (sabit indirme linki)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest EvTV.apk -t "EvTV son sürüm" -n "Otomatik derleme: ${GITHUB_SHA::7}"
