@@ -70,6 +70,13 @@ class VodPlayerActivity : ComponentActivity() {
     private lateinit var titleText: TextView
     private lateinit var subText: TextView
     private lateinit var messageText: TextView
+    private lateinit var seekBox: LinearLayout
+    private lateinit var seekText: TextView
+    private lateinit var seekBar: android.widget.ProgressBar
+    private val hideSeek = Runnable {
+        seekBox.visibility = View.GONE
+        seekTarget = -1L
+    }
     private lateinit var subPanel: LinearLayout
     private lateinit var subStatus: TextView
     private lateinit var subList: ListView
@@ -282,16 +289,41 @@ class VodPlayerActivity : ComponentActivity() {
             isFocusableInTouchMode = true
             onCenterWhenError = { if (hasError) retry() else false }
             onMenu = { openSubtitlePanel() }
+            onSeek = { forward, repeat -> quickSeek(forward, repeat) }
             subtitleView?.let { styleSubtitles(it, vm.subtitleSize) }
             setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v ->
                 titleBox.visibility = v
             })
         }
 
+        // ---- Sağ/sol ile sarma göstergesi (kontrol paneli açılmadan) ----
+        seekText = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        seekBar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 1000
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF4C8DFF.toInt())
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0x66FFFFFF)
+        }
+        seekBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(48), dp(40), dp(48), dp(36))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.BOTTOM_TOP,
+                intArrayOf(0xDD000000.toInt(), 0x00000000),
+            )
+            visibility = View.GONE
+            addView(seekText)
+            addView(seekBar, LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(10) })
+        }
+
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(view, FrameLayout.LayoutParams(-1, -1))
             addView(titleBox, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+            addView(seekBox, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
             addView(messageText, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
             addView(subPanel, FrameLayout.LayoutParams(dp(560), -1, Gravity.END))
         }
@@ -313,6 +345,38 @@ class VodPlayerActivity : ComponentActivity() {
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    /** Basılı tutuldukça hızlanan sarma: 10 sn geri / 30 sn ileri, tuttukça 2-5 dakikaya kadar. */
+    private var seekTarget = -1L
+
+    private fun quickSeek(forward: Boolean, repeat: Int) {
+        val dur = player.duration.takeIf { it != MC.TIME_UNSET && it > 0 }
+        val base = if (forward) 30_000L else 10_000L
+        val step = when {
+            repeat < 5 -> base
+            repeat < 15 -> base * 2
+            repeat < 30 -> 120_000L
+            else -> 300_000L
+        }
+        // Art arda basışlarda bir önceki hedeften devam et (oynatıcı henüz yetişmemiş olabilir)
+        val from = if (seekBox.visibility == View.VISIBLE && seekTarget >= 0) seekTarget else player.currentPosition
+        var target = if (forward) from + step else from - step
+        target = target.coerceAtLeast(0L)
+        if (dur != null) target = target.coerceAtMost(dur - 2_000)
+        seekTarget = target
+        player.seekTo(target)
+
+        val sign = if (forward) "⏩" else "⏪"
+        seekText.text = buildString {
+            append(sign).append("  ")
+            append(fmtTime(target))
+            if (dur != null) append("  /  ").append(fmtTime(dur))
+        }
+        seekBar.progress = if (dur != null) ((target * 1000) / dur).toInt() else 0
+        seekBox.visibility = View.VISIBLE
+        handler.removeCallbacks(hideSeek)
+        handler.postDelayed(hideSeek, 2_000)
+    }
 
     /**
      * Oynatıcı düğmelerine belirgin odak görünümü: seçili düğme mavi daire içinde ve büyür;
@@ -614,6 +678,8 @@ private fun styleSubtitles(v: SubtitleView, size: Int) {
 class TvPlayerView(ctx: Context) : PlayerView(ctx) {
     var onCenterWhenError: (() -> Boolean)? = null
     var onMenu: (() -> Unit)? = null
+    /** Sağ/sol: (ileri mi, tuş tekrar sayısı) */
+    var onSeek: ((Boolean, Int) -> Unit)? = null
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val p = player ?: return super.dispatchKeyEvent(event)
@@ -628,13 +694,11 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
         if (event.action == KeyEvent.ACTION_DOWN && !isControllerFullyVisible) {
             when {
                 code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                    p.seekBack()
-                    showController()
+                    onSeek?.invoke(false, event.repeatCount) ?: p.seekBack()
                     return true
                 }
                 code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                    p.seekForward()
-                    showController()
+                    onSeek?.invoke(true, event.repeatCount) ?: p.seekForward()
                     return true
                 }
                 isCenter -> {
@@ -647,7 +711,9 @@ class TvPlayerView(ctx: Context) : PlayerView(ctx) {
             }
         }
         // Gizliyken orta tuşun bırakılması kontrol düğmesine basmasın
-        if (event.action == KeyEvent.ACTION_UP && isCenter && !isControllerFullyVisible) return true
+        if (event.action == KeyEvent.ACTION_UP && !isControllerFullyVisible &&
+            (isCenter || code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)
+        ) return true
         return super.dispatchKeyEvent(event)
     }
 }

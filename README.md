@@ -33,7 +33,7 @@ Xtream Codes hesabınla çalışan, TiviMate tarzı sade bir oynatıcı.
 ### Film oynatıcıda tuşlar
 | Tuş | İşlev |
 |---|---|
-| Sol / Sağ | 10 sn geri / 30 sn ileri |
+| Sol / Sağ | 10 sn geri / 30 sn ileri (kontroller açılmaz; basılı tutunca hızlanır) |
 | Orta tuş | Duraklat / oynat ve kontrolleri aç |
 | Kontroller açıkken | CC = altyazı, ⚙ = ses dili ve hız, ⏭ = sonraki bölüm |
 | Geri | Kontrolleri kapat, tekrar basınca çık |
