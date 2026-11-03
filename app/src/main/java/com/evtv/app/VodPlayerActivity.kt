@@ -581,19 +581,31 @@ class VodPlayerActivity : ComponentActivity() {
         val idx = player.currentMediaItemIndex
         val cur = player.currentMediaItem ?: return
         val pos = player.currentPosition
+        // Dosyanın gerçek biçimine göre (SRT / VTT / ASS)
+        val head = runCatching { file.bufferedReader().use { r -> CharArray(512).let { b -> String(b, 0, r.read(b).coerceAtLeast(0)) } } }
+            .getOrDefault("").trimStart('\uFEFF', ' ', '\n', '\r')
+        val mime = when {
+            head.startsWith("WEBVTT") -> MimeTypes.TEXT_VTT
+            head.contains("[Script Info]", ignoreCase = true) -> MimeTypes.TEXT_SSA
+            else -> MimeTypes.APPLICATION_SUBRIP
+        }
         val sub = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file))
-            .setMimeType(MimeTypes.APPLICATION_SUBRIP)
+            .setMimeType(mime)
             .setLanguage(lang)
             .setLabel(label)
+            .setId("web_$lang")
             .setSelectionFlags(MC.SELECTION_FLAG_DEFAULT)
             .build()
         val item = cur.buildUpon().setSubtitleConfigurations(listOf(sub)).build()
+        // CC menüsünden yapılmış "Kapalı" / başka iz seçimi yeni altyazıyı gizlemesin
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(MC.TRACK_TYPE_TEXT)
             .setTrackTypeDisabled(MC.TRACK_TYPE_TEXT, false)
             .setPreferredTextLanguage(lang)
             .build()
-        player.replaceMediaItem(idx, item)
-        player.seekTo(idx, pos)
+        // Listeyi yeniden kur: aynı adreste "güncelleme" yapılırsa oynatıcı altyazıyı yüklemiyor
+        val items = (0 until player.mediaItemCount).map { if (it == idx) item else player.getMediaItemAt(it) }
+        player.setMediaItems(items, idx, pos)
         player.prepare()
         player.play()
     }
