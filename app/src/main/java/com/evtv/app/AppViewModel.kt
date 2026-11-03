@@ -148,6 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             api = XtreamApi(prefs.server, prefs.user, prefs.pass)
             load(useCache = true)
         }
+        refreshAccountLater()
         // Açılıştan biraz sonra yeni sürüm var mı bak
         viewModelScope.launch {
             delay(4_000)
@@ -187,6 +188,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     prefs.pass = password
                     prefs.streamExt = r.preferredExt
                     api = a
+                    refreshAccount()
                     pendingFocus = FocusTarget.Category
                     screen = Screen.Home
                     load(useCache = false)
@@ -1049,6 +1051,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         openGroups[type] = code
     }
 
+    // ---- Abonelik bilgisi ----
+
+    var account by mutableStateOf<AccountInfo?>(null)
+        private set
+
+    private fun refreshAccountLater() {
+        viewModelScope.launch {
+            delay(2_000)
+            refreshAccount()
+        }
+    }
+
+    fun refreshAccount() {
+        val a = api ?: return
+        viewModelScope.launch {
+            try {
+                a.accountInfo()?.let { account = it }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /** Kalan gün (bitiş tarihi yoksa null) */
+    fun daysLeft(): Long? {
+        val exp = account?.expiresAt ?: return null
+        val ms = exp - System.currentTimeMillis()
+        return if (ms <= 0) 0L else (ms + 86_399_999) / 86_400_000
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()
@@ -1070,6 +1103,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         loading = false
         refreshing = false
+        account = null
         screen = Screen.Login
     }
 }

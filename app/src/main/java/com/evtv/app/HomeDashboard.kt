@@ -146,6 +146,20 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = PaddingValues(bottom = 40.dp),
             ) {
+                // ---- Abonelik bitmek üzereyse uyarı ----
+                val days = vm.daysLeft()
+                if (days != null && days <= 7) item(key = "expiry") {
+                    Text(
+                        if (days == 0L) "⚠  IPTV aboneliğinin süresi doldu. Yenilemen gerekiyor."
+                        else "⚠  IPTV aboneliğinin bitmesine $days gün kaldı.",
+                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 4.dp).fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (days <= 3) Color(0xFFB42318) else Color(0xFF9A5B00))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    )
+                }
+
                 // ---- Büyük kutular ----
                 item(key = "tiles") {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {

@@ -29,6 +29,16 @@ data class EpgItem(val title: String, val start: Long, val end: Long)
 
 class LoginResult(val ok: Boolean, val message: String?, val preferredExt: String)
 
+/** Abonelik bilgisi (sunucunun user_info alanından) */
+data class AccountInfo(
+    /** Bitiş zamanı (ms); null = süresiz veya bilinmiyor */
+    val expiresAt: Long?,
+    val maxConnections: Int?,
+    val activeConnections: Int?,
+    val status: String,
+    val trial: Boolean,
+)
+
 /** Kullanıcının yapıştırdığı M3U linkinden (get.php?username=..&password=..) bilgileri ayıklar. */
 data class ParsedLink(val server: String, val user: String?, val pass: String?)
 
@@ -167,6 +177,24 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
         val list = (0 until (formats?.length() ?: 0)).map { formats!!.optString(it) }
         val ext = if (list.isEmpty() || "ts" in list) "ts" else "m3u8"
         return LoginResult(true, null, ext)
+    }
+
+    /** Hesabın bitiş tarihi ve bağlantı bilgisi */
+    suspend fun accountInfo(): AccountInfo? {
+        val o = try {
+            JSONObject(fetchText(""))
+        } catch (e: org.json.JSONException) {
+            return null
+        }
+        val info = o.optJSONObject("user_info") ?: return null
+        fun num(k: String) = info.optString(k).trim().takeIf { it.isNotBlank() && it != "null" }?.toDoubleOrNull()
+        return AccountInfo(
+            expiresAt = num("exp_date")?.toLong()?.takeIf { it > 0 }?.times(1000),
+            maxConnections = num("max_connections")?.toInt(),
+            activeConnections = num("active_cons")?.toInt(),
+            status = info.optString("status"),
+            trial = info.optString("is_trial") == "1",
+        )
     }
 
     suspend fun liveCategories(): List<Category> =

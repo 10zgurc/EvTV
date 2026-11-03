@@ -545,6 +545,8 @@ fun SettingsPane(vm: AppViewModel) {
         )
 
         Text("Hesap", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
+        LaunchedEffect(Unit) { vm.refreshAccount() }
+        AccountRows(vm)
         FocusRow(onClick = {
             if (!vm.refreshing) vm.load()
             vm.ensureVodCategories(force = true)
@@ -799,5 +801,39 @@ private fun SeriesPart(
                 ep.duration?.let { Text(it, color = if (f) C.text else C.sub, fontSize = 14.sp) }
             }
         }
+    }
+}
+
+private val dateFmtTr = java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale("tr"))
+
+/** Abonelik bitişi ve bağlantı sayısı */
+@Composable
+fun AccountRows(vm: AppViewModel) {
+    val acc = vm.account
+    val days = vm.daysLeft()
+    Column(Modifier.padding(start = 14.dp, bottom = 8.dp)) {
+        if (acc == null) {
+            Text("Abonelik bilgisi alınıyor…", color = C.sub, fontSize = 15.sp)
+            return@Column
+        }
+        val exp = acc.expiresAt
+        Text(
+            when {
+                exp == null -> "Abonelik: süresiz"
+                days == 0L -> "Abonelik: süresi doldu (${dateFmtTr.format(java.util.Date(exp))})"
+                else -> "Abonelik bitişi: ${dateFmtTr.format(java.util.Date(exp))}  •  $days gün kaldı"
+            },
+            color = when {
+                days != null && days <= 3 -> C.error
+                days != null && days <= 7 -> C.star
+                else -> C.text
+            },
+            fontSize = 17.sp,
+        )
+        val conn = listOfNotNull(
+            acc.maxConnections?.let { m -> "Bağlantı hakkı: $m cihaz" + (acc.activeConnections?.let { " (şu an $it kullanımda)" } ?: "") },
+            if (acc.trial) "Deneme hesabı" else null,
+        ).joinToString("  •  ")
+        if (conn.isNotBlank()) Text(conn, color = C.sub, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
     }
 }
