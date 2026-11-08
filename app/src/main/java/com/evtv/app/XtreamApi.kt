@@ -114,7 +114,8 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
     internal suspend fun streamEach(query: String, onItem: (Map<String, String?>, Int) -> Unit) =
         withContext(Dispatchers.IO) {
             val c = open(query)
-            try {
+            // Büyük listeyi ayrıştırırken ekranı yavaşlatmasın
+            try { lowPriority {
                 JsonReader(InputStreamReader(c.inputStream.buffered(64 * 1024), Charsets.UTF_8)).use { r ->
                     r.isLenient = true
                     if (r.peek() == JsonToken.BEGIN_ARRAY) {
@@ -130,7 +131,7 @@ class XtreamApi(serverRaw: String, private val user: String, private val pass: S
                         r.skipValue()
                     }
                 }
-            } finally {
+            } } finally {
                 c.disconnect()
             }
         }

@@ -97,9 +97,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Kanallar bir kez kategorilere ayrılır; kategori değiştirmek anında olur (60 bin+ kanalda bile). */
-    private val channelsByCategory by derivedStateOf {
-        allChannels.groupBy { it.categoryId ?: "" }
-    }
+    /** Kanallar kategorilere arka planda ayrılır (applyLists) */
+    private var channelsByCategory by mutableStateOf<Map<String, List<Channel>>>(emptyMap())
 
     private val favoriteChannels by derivedStateOf {
         allChannels.filter { it.streamId in favorites }
@@ -241,7 +240,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private var autoStarted = false
 
-    private fun applyLists(cats: List<Category>, chans: List<Channel>) {
+    private suspend fun applyLists(cats: List<Category>, chans: List<Channel>) {
+        channelsByCategory = withContext(Heavy) { chans.groupBy { it.categoryId ?: "" } }
         serverCategories = cats
         allChannels = chans
         if (!autoStarted && prefs.startLastChannel && screen == Screen.Home) {
@@ -735,8 +735,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (!index(series).exists) return
+        if (q.trim().length < 2) {
+            searchResults[series] = emptyList()
+            return
+        }
         searchJobs[series] = viewModelScope.launch {
-            delay(350)
+            delay(600)
             searching = true
             try {
                 searchResults[series] = index(series).search(q)
@@ -1109,6 +1113,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         cache.clear()
         api = null
         allChannels = emptyList()
+        channelsByCategory = emptyMap()
         serverCategories = emptyList()
         playList = emptyList()
         epg.clear()

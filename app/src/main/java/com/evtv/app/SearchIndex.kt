@@ -78,7 +78,7 @@ class SearchIndex(ctx: Context, private val type: String) {
     private fun clean(s: String?) = s.orEmpty().replace('\t', ' ').replace('\n', ' ').replace('\r', ' ').trim()
 
     /** Dosyadaki adları belleğe alır (ilk aramada bir kez). */
-    private suspend fun ensureLoaded() = withContext(Dispatchers.IO) {
+    private suspend fun ensureLoaded() = withContext(Heavy) {
         if (norms != null) return@withContext
         val ns = ArrayList<String>(meta.getInt("count_$type", 1000) + 16)
         val offs = ArrayList<Long>(ns.size)
@@ -106,7 +106,7 @@ class SearchIndex(ctx: Context, private val type: String) {
         offsets = offs.toLongArray()
     }
 
-    suspend fun search(query: String, limit: Int = 180): List<VodItem> = withContext(Dispatchers.Default) {
+    suspend fun search(query: String, limit: Int = 180): List<VodItem> = withContext(Heavy) {
         if (!exists) return@withContext emptyList()
         ensureLoaded()
         val ns = norms ?: return@withContext emptyList()
