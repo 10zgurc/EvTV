@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -96,9 +97,15 @@ fun TvField(
     imeSearch: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    // İmleç her zaman yazının sonunda başlasın (silme tuşu doğrudan çalışsın)
+    var tfv by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(value, androidx.compose.ui.text.TextRange(value.length))) }
+    if (tfv.text != value) tfv = androidx.compose.ui.text.input.TextFieldValue(value, androidx.compose.ui.text.TextRange(value.length))
     OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
+        value = tfv,
+        onValueChange = {
+            tfv = it
+            if (it.text != value) onChange(it.text)
+        },
         label = { Text(label) },
         singleLine = true,
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
@@ -124,7 +131,9 @@ fun TvField(
             unfocusedLabelColor = C.sub,
         ),
         // Kumandanın yukarı/aşağı tuşları alanlar arasında gezsin
-        modifier = modifier.fillMaxWidth().onPreviewKeyEvent { e ->
+        modifier = modifier.fillMaxWidth()
+            .onFocusChanged { if (it.isFocused) tfv = tfv.copy(selection = androidx.compose.ui.text.TextRange(tfv.text.length)) }
+            .onPreviewKeyEvent { e ->
             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when (e.nativeKeyEvent.keyCode) {
                 AndroidKey.KEYCODE_DPAD_DOWN -> fm.moveFocus(FocusDirection.Down)
