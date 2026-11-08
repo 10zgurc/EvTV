@@ -925,7 +925,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Updater.openInstallPermission(ctx)
             return
         }
-        updateFile?.takeIf { it.exists() }?.let {
+        // Daha önce sağlam inmiş dosya varsa onu kur; yoksa yeniden indir
+        updateFile?.takeIf { it.exists() && it.length() > 0 }?.let {
+            updateMessage = "Kurulum ekranı açılmazsa ya da hata verirse: tarayıcıdan github.com/10zgurc/EvTV/releases/download/latest/OzzyTV.apk"
             Updater.install(ctx, it)
             return
         }
@@ -937,6 +939,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val f = Updater.download(ctx, info) { p -> viewModelScope.launch { updateProgress = p } }
                 updateFile = f
                 updateProgress = null
+                updateMessage = "Kurulum ekranı açılmazsa ya da hata verirse: tarayıcıdan github.com/10zgurc/EvTV/releases/download/latest/OzzyTV.apk"
                 Updater.install(ctx, f)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

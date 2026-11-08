@@ -102,6 +102,15 @@ object Updater {
         } finally {
             c.disconnect()
         }
+        // Yarım ya da bozuk inen dosyayı kurmaya çalışma ("paket ayrıştırılamadı" hatası)
+        val sizeOk = total <= 0 || out.length() == total
+        val zipOk = runCatching {
+            java.util.zip.ZipFile(out).use { z -> z.getEntry("AndroidManifest.xml") != null }
+        }.getOrDefault(false)
+        if (!sizeOk || !zipOk) {
+            out.delete()
+            throw IOException("Dosya yarım indi. İnternet bağlantını kontrol edip tekrar \"Güncelle\"ye bas.")
+        }
         out
     }
 
