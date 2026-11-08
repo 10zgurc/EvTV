@@ -850,6 +850,10 @@ fun LoginInfoRow(vm: AppViewModel) {
                 Text("Sunucu: ${vm.savedServer}", color = C.sub, fontSize = 15.sp)
                 Text("Kullanıcı adı: ${vm.savedUser}", color = C.sub, fontSize = 15.sp)
                 Text("Şifre: ${vm.savedPass}", color = C.sub, fontSize = 15.sp)
+                Text("Altyazı (OpenSubtitles)", color = C.accent, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("API anahtarı: ${vm.osKey.ifBlank { "—" }}", color = C.sub, fontSize = 15.sp)
+                Text("Kullanıcı adı: ${vm.osUser.ifBlank { "—" }}", color = C.sub, fontSize = 15.sp)
+                Text("Şifre: ${vm.osPass.ifBlank { "—" }}", color = C.sub, fontSize = 15.sp)
             }
         }
         Text(if (show) "Gizle" else "Göster", color = if (f) C.text else C.accent, fontSize = 15.sp)
