@@ -84,6 +84,9 @@ fun GuideScreen(vm: AppViewModel, catState: LazyListState, tabReq: FocusRequeste
     val fm = LocalFocusManager.current
     val catDeb = rememberDebouncer<String> { vm.selectCategory(it) }
 
+    // Geri: kanal listesine dön
+    androidx.activity.compose.BackHandler { vm.closeGuide() }
+
     var shownCat by remember { mutableStateOf(vm.selectedCategoryId) }
     LaunchedEffect(vm.selectedCategoryId) {
         if (shownCat != vm.selectedCategoryId) {
@@ -145,7 +148,7 @@ fun GuideScreen(vm: AppViewModel, catState: LazyListState, tabReq: FocusRequeste
                 val inf = info
                 when {
                     message != null -> Text(message ?: "", color = C.accent, fontSize = 17.sp)
-                    inf == null -> Text("Bir programa gel: orta tuş ile şu an yayında olanı izle.", color = C.sub, fontSize = 16.sp)
+                    inf == null -> Text("Bir programa gel: orta tuş ile şu an yayında olanı izle  •  Geri: kanal listesi", color = C.sub, fontSize = 16.sp)
                     else -> {
                         Text(
                             inf.item?.title ?: inf.ch.name, color = C.text, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,

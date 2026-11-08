@@ -107,7 +107,7 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
                 contentDescription = "OzzyTV",
                 modifier = Modifier.height(32.dp).padding(end = 12.dp),
             )
-            for (s in Section.entries) {
+            for (s in Section.entries.filter { it != Section.Guide }) {
                 val label = when (s) {
                     Section.Home -> "Ana Sayfa"
                     Section.Live -> "Canlı TV"
@@ -142,8 +142,9 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
         Box(Modifier.weight(1f)) {
             when (vm.section) {
                 Section.Home -> HomeDashboard(vm, tabReq)
-                Section.Live -> LiveHome(vm, st.liveCats, st.liveChannels, tabReq)
-                Section.Guide -> GuideScreen(vm, st.liveCats, tabReq)
+                Section.Live, Section.Guide ->
+                    if (vm.liveGuideMode) GuideScreen(vm, st.liveCats, tabReq)
+                    else LiveHome(vm, st.liveCats, st.liveChannels, tabReq)
                 Section.Movies -> VodHome(vm, false, st.movieCats, st.movieGrid, tabReq)
                 Section.Series -> VodHome(vm, true, st.seriesCats, st.seriesGrid, tabReq)
                 Section.Settings -> SettingsPane(vm)

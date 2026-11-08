@@ -1085,6 +1085,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Kayıtlı giriş bilgileri (Ayarlar'da gösterim için) ----
     val savedPass get() = prefs.pass
 
+    // ---- Canlı TV içinde ızgara (rehber) görünümü ----
+    var liveGuideMode by mutableStateOf(false)
+        private set
+
+    fun openGuide() {
+        liveGuideMode = true
+        pendingFocus = FocusTarget.Category
+        if (section != Section.Live) selectSection(Section.Live)
+    }
+
+    fun closeGuide() {
+        liveGuideMode = false
+        pendingFocus = FocusTarget.Category
+    }
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()

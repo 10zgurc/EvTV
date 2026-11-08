@@ -172,8 +172,11 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
                                 // Açılan bölümde odak hazır olsun
                                 vm.pendingFocus = FocusTarget.Category
                                 when (t.key) {
-                                    "t_live" -> vm.selectSection(Section.Live)
-                                    "t_guide" -> vm.selectSection(Section.Guide)
+                                    "t_live" -> {
+                                        vm.closeGuide()
+                                        vm.selectSection(Section.Live)
+                                    }
+                                    "t_guide" -> vm.openGuide()
                                     "t_movies" -> vm.selectSection(Section.Movies)
                                     "t_series" -> vm.selectSection(Section.Series)
                                     "t_search" -> {

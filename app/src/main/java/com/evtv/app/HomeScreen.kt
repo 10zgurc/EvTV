@@ -36,6 +36,8 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -126,12 +128,26 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
         Spacer(Modifier.width(24.dp))
 
         // ---- Sağ: seçili kanal bilgisi + kanal listesi ----
-        Column(Modifier.weight(1f).fillMaxHeight()) {
+        Column(
+            Modifier.weight(1f).fillMaxHeight().onPreviewKeyEvent { e ->
+                // Kumandadaki "Guide/EPG" tuşu ızgarayı açar
+                if (e.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                    e.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_GUIDE
+                ) { vm.openGuide(); true } else false
+            },
+        ) {
             ChannelHeader(vm, focused)
             vm.error?.takeIf { channels.isNotEmpty() }?.let {
                 Text(it, color = C.error, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp, start = 4.dp))
             }
-            Spacer(Modifier.height(12.dp))
+            Row(Modifier.padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    FocusRow(fill = false, onClick = { vm.openGuide() }) { f ->
+                        Text("📅  Izgara görünümü", color = if (f) C.text else C.accent, fontSize = 15.sp)
+                    }
+                }
+                Text("saat saat yayın akışı", color = C.sub, fontSize = 13.sp, modifier = Modifier.padding(start = 6.dp))
+            }
 
             when {
                 vm.loading && channels.isEmpty() -> CenterBox {
@@ -165,8 +181,15 @@ fun LiveHome(vm: AppViewModel, catState: LazyListState, chState: LazyListState, 
                             chReq[ch.streamId] = fr
                             onDispose { if (chReq[ch.streamId] === fr) chReq.remove(ch.streamId) }
                         }
+                        // Ekrandaki satırların yayın akışı (hızlı kaydırırken istek atılmaz)
+                        LaunchedEffect(ch.streamId) {
+                            delay(450)
+                            vm.loadEpg(ch.streamId)
+                        }
                         ChannelRow(
                             ch = ch,
+                            epg = vm.epg[ch.streamId],
+                            now = vm.now,
                             fav = vm.isFavorite(ch.streamId),
                             modifier = Modifier.focusRequester(fr),
                             onFocused = { focused = ch },
@@ -208,20 +231,49 @@ fun CenterBox(content: @Composable () -> Unit) {
 @Composable
 private fun ChannelRow(
     ch: Channel,
+    epg: List<EpgItem>?,
+    now: Long,
     fav: Boolean,
     modifier: Modifier,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val cur = epg?.firstOrNull { it.start <= now && it.end > now }
+    val next = epg?.firstOrNull { it.start >= (cur?.end ?: now) }
     FocusRow(modifier = modifier, onFocused = onFocused, onClick = onClick, onLongClick = onLongClick) { f ->
         Text("${ch.num}", color = if (f) C.text else C.sub, fontSize = 15.sp, modifier = Modifier.width(52.dp))
         Logo(ch, 64, 40)
-        Text(
-            ch.name, color = C.text, fontSize = 18.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (fav) Text("★", color = C.star, fontSize = 18.sp)
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    ch.name, color = C.text, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (fav) Text("  ★", color = C.star, fontSize = 16.sp)
+            }
+            // Şimdi: program adı + ilerleme; yanında sıradaki
+            if (cur != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        cur.title, color = if (f) C.text else C.sub, fontSize = 14.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (next != null) {
+                        Text(
+                            "   ›  ${hm(next.start)} ${next.title}", color = if (f) C.text.copy(alpha = 0.75f) else C.sub.copy(alpha = 0.7f),
+                            fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
+                }
+                val p = ((now - cur.start).toFloat() / (cur.end - cur.start).coerceAtLeast(1L)).coerceIn(0f, 1f)
+                Box(Modifier.padding(top = 3.dp).fillMaxWidth(0.55f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(C.selected)) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(p).background(if (f) C.text else C.accent))
+                }
+            } else if (next != null) {
+                Text("${hm(next.start)} ${next.title}", color = C.sub, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
