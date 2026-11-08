@@ -547,6 +547,7 @@ fun SettingsPane(vm: AppViewModel) {
         Text("Hesap", color = C.accent, fontSize = 16.sp, modifier = Modifier.padding(start = 14.dp, bottom = 4.dp))
         LaunchedEffect(Unit) { vm.refreshAccount() }
         AccountRows(vm)
+        LoginInfoRow(vm)
         FocusRow(onClick = {
             if (!vm.refreshing) vm.load()
             vm.ensureVodCategories(force = true)
@@ -835,5 +836,22 @@ fun AccountRows(vm: AppViewModel) {
             if (acc.trial) "Deneme hesabı" else null,
         ).joinToString("  •  ")
         if (conn.isNotBlank()) Text(conn, color = C.sub, fontSize = 15.sp, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+/** Kayıtlı IPTV giriş bilgileri; şifre basınca görünür */
+@Composable
+fun LoginInfoRow(vm: AppViewModel) {
+    var show by remember { mutableStateOf(false) }
+    FocusRow(onClick = { show = !show }) { f ->
+        Column(Modifier.weight(1f)) {
+            Text("Giriş bilgilerim", color = C.text, fontSize = 17.sp)
+            if (show) {
+                Text("Sunucu: ${vm.savedServer}", color = C.sub, fontSize = 15.sp)
+                Text("Kullanıcı adı: ${vm.savedUser}", color = C.sub, fontSize = 15.sp)
+                Text("Şifre: ${vm.savedPass}", color = C.sub, fontSize = 15.sp)
+            }
+        }
+        Text(if (show) "Gizle" else "Göster", color = if (f) C.text else C.accent, fontSize = 15.sp)
     }
 }

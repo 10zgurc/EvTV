@@ -1082,6 +1082,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return if (ms <= 0) 0L else (ms + 86_399_999) / 86_400_000
     }
 
+    // ---- Kayıtlı giriş bilgileri (Ayarlar'da gösterim için) ----
+    val savedPass get() = prefs.pass
+
     fun logout() {
         loadJob?.cancel()
         prefs.clearAccount()
