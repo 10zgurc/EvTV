@@ -67,13 +67,10 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
     val newMovies = vm.featuredCategory(false)?.let { vm.vodItems[vm.vodKey(false, it)] }?.take(30).orEmpty()
     val newSeries = vm.featuredCategory(true)?.let { vm.vodItems[vm.vodKey(true, it)] }?.take(30).orEmpty()
 
+    // Üst sekmelerde olmayan iki kısayol (Canlı TV/Filmler/Diziler/Ayarlar zaten sekmelerde)
     val tiles = listOf(
-        TileSpec("t_live", "📺", "Canlı TV", "${vm.countFor(CAT_ALL)} kanal", Color(0xFF2B6BFF), Color(0xFF1B3FA8)),
         TileSpec("t_guide", "📅", "Rehber", "Saat saat yayın akışı", Color(0xFFF59E0B), Color(0xFF9A5B00)),
-        TileSpec("t_movies", "🎬", "Filmler", "Kategoriler, arama, listem", Color(0xFFE5484D), Color(0xFF8E1F2B)),
-        TileSpec("t_series", "🍿", "Diziler", "Sezonlar ve bölümler", Color(0xFF8B5CF6), Color(0xFF4C2A9E)),
-        TileSpec("t_search", "🔍", "Ara", "Film veya dizi bul", Color(0xFF14B8A6), Color(0xFF0B6B61)),
-        TileSpec("t_settings", "⚙️", "Ayarlar", "Altyazı, oynatma, hesap", Color(0xFF475569), Color(0xFF1E293B)),
+        TileSpec("t_search", "🔍", "Film / dizi ara", "", Color(0xFF14B8A6), Color(0xFF0B6B61)),
     )
 
     // Odak: açılışta ilk kutu, geri dönünce son tıklanan öğe
@@ -88,7 +85,7 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
         }
         if (back || startup) {
             vm.pendingFocus = FocusTarget.None
-            focusWhenReady { reqs["t_live"] }
+            focusWhenReady { reqs["t_guide"] }
         }
     }
 
@@ -161,29 +158,19 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
                 }
 
                 // ---- Büyük kutular ----
+                // ---- Küçük kısayollar ----
                 item(key = "tiles") {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(Modifier.padding(horizontal = 4.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         for (t in tiles) {
-                            BigTile(
-                                t, Modifier.weight(1f), reg(reqs, t.key),
-                                onFocus = { hero = Hero.Tile(t.title, t.text) },
-                            ) {
+                            QuickChip(t, reg(reqs, t.key)) {
                                 vm.homeLastKey = t.key
-                                // Açılan bölümde odak hazır olsun
                                 vm.pendingFocus = FocusTarget.Category
                                 when (t.key) {
-                                    "t_live" -> {
-                                        vm.closeGuide()
-                                        vm.selectSection(Section.Live)
-                                    }
                                     "t_guide" -> vm.openGuide()
-                                    "t_movies" -> vm.selectSection(Section.Movies)
-                                    "t_series" -> vm.selectSection(Section.Series)
-                                    "t_search" -> {
+                                    else -> {
                                         vm.selectSection(Section.Movies)
                                         vm.selectVodCategory(false, CAT_SEARCH)
                                     }
-                                    else -> vm.selectSection(Section.Settings)
                                 }
                             }
                         }
@@ -341,5 +328,26 @@ private fun ChannelCard(ch: Channel, fr: FocusRequester, onFocus: () -> Unit, on
         }
         Text(ch.name, color = if (focused) C.text else C.sub, fontSize = 14.sp, maxLines = 1,
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, start = 2.dp))
+    }
+}
+
+/** Küçük, renkli kısayol düğmesi */
+@Composable
+private fun QuickChip(t: TileSpec, fr: FocusRequester, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(24.dp)
+    Row(
+        Modifier
+            .focusRequester(fr)
+            .onFocusChanged { focused = it.isFocused }
+            .tvClickable(onClick)
+            .clip(shape)
+            .background(if (focused) Brush.linearGradient(listOf(t.c1, t.c2)) else Brush.linearGradient(listOf(C.panel, C.panel)))
+            .then(if (focused) Modifier.border(2.dp, Color.White, shape) else Modifier)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(t.icon, fontSize = 18.sp)
+        Text(t.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 10.dp))
     }
 }
