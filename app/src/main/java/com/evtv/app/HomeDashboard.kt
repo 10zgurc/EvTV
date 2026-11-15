@@ -61,7 +61,8 @@ fun HomeDashboard(vm: AppViewModel, tabReq: FocusRequester) {
     var hero by remember { mutableStateOf<Hero>(Hero.Tile("Hoş geldin", "Canlı TV, filmler ve diziler tek yerde.")) }
     vm.watchVersion // izleme geçmişi değişince satırlar yenilensin
 
-    val recents = vm.watch.allRecents().take(30)
+    // Sadece yarım kalanlar (bitmiş filmler düşer), en son 6 tane
+    val recents = vm.watch.allRecents().filter { it.isSeries || !vm.watch.isDone("m${it.id}") }.take(6)
     val favChannels = vm.favoriteChannelList.take(30)
     val myList = vm.watch.allMyList().take(30)
     val newMovies = vm.featuredCategory(false)?.let { vm.vodItems[vm.vodKey(false, it)] }?.take(30).orEmpty()
