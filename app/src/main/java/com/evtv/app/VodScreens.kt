@@ -90,7 +90,8 @@ fun HomeScreen(vm: AppViewModel, st: HomeStates) {
     val tabDeb = rememberDebouncer<Section>(350) { vm.selectSection(it) }
 
     LaunchedEffect(vm.section) {
-        if (vm.section == Section.Movies || vm.section == Section.Series) vm.ensureVodCategories()
+        // Ana Sayfa da "Yeni filmler / diziler" satırları için kategorileri ister
+        if (vm.section == Section.Movies || vm.section == Section.Series || vm.section == Section.Home) vm.ensureVodCategories()
     }
 
     // Geri: önce Ana Sayfa'ya dön, Ana Sayfa'dayken uygulamadan çık
